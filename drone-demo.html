@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daksha Flight Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Expanded:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#0A100E;
+    --bg-raised:#101915;
+    --bg-card:#141F1A;
+    --line:#233129;
+    --text:#E9EEE9;
+    --text-dim:#A9B8AF;
+    --text-faint:#5E7168;
+    --accent:#FF7A3D;
+    --accent-dim:#C9602F;
+    --accent-glow:rgba(255,122,61,0.35);
+    --teal:#4FC1B4;
+    --teal-dim:#2F8B80;
+    --thermal-cold:#1a0a3d;
+    --thermal-mid:#c21e56;
+    --thermal-hot:#ffb020;
+    --font-display:'Archivo Expanded','Arial Narrow',sans-serif;
+    --font-body:'IBM Plex Sans',Arial,sans-serif;
+    --font-mono:'IBM Plex Mono','Courier New',monospace;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{background:var(--bg); height:100%;}
+  body{
+    color:var(--text);
+    font-family:var(--font-body);
+    display:flex; align-items:center; justify-content:center;
+    height:100vh;
+    overflow:hidden;
+  }
+
+  .stage-shell{
+    display:flex; width:100%; height:100%;
+  }
+
+  .stage{
+    position:relative;
+    width:100%; height:100%;
+    background:var(--bg);
+    overflow:hidden;
+  }
+
+  /* ---------- Sky ---------- */
+  .sky{
+    position:absolute; inset:0;
+    background:
+      radial-gradient(ellipse 60% 45% at 22% 8%, rgba(255,122,61,0.10), transparent 65%),
+      radial-gradient(ellipse 50% 40% at 82% 4%, rgba(79,193,180,0.08), transparent 60%),
+      linear-gradient(180deg, #060B08 0%, #0A130E 55%, #0D1A13 100%);
+  }
+  .stars{position:absolute; inset:0 0 55% 0; opacity:0.5;}
+  .star{position:absolute; width:2px; height:2px; background:var(--text-dim); border-radius:50%; opacity:0.6; animation:twinkle 3.4s ease-in-out infinite;}
+  @keyframes twinkle{ 0%,100%{opacity:0.15;} 50%{opacity:0.75;} }
+
+  /* ---------- Terrain (parallax silhouette ridges) ---------- */
+  .ridge{position:absolute; left:-5%; width:110%; bottom:0;}
+  .ridge svg{display:block; width:100%; height:auto;}
+  .ridge-far{opacity:0.55; animation:driftFar 28s linear infinite; will-change:transform;}
+  .ridge-mid{opacity:0.8; animation:driftMid 20s linear infinite; will-change:transform;}
+  .ridge-near{animation:driftNear 13s linear infinite; will-change:transform;}
+  @keyframes driftFar{ from{transform:translateX(0);} to{transform:translateX(-4%);} }
+  @keyframes driftMid{ from{transform:translateX(0);} to{transform:translateX(-6%);} }
+  @keyframes driftNear{ from{transform:translateX(0);} to{transform:translateX(-9%);} }
+
+  /* ---------- Scanline / grain / vignette overlays ---------- */
+  .vignette{
+    position:absolute; inset:0; pointer-events:none;
+    background:radial-gradient(ellipse 75% 75% at 50% 45%, transparent 55%, rgba(0,0,0,0.55) 100%);
+    z-index:40;
+  }
+  .scanlines{
+    position:absolute; inset:0; pointer-events:none; z-index:41;
+    background:repeating-linear-gradient(180deg, rgba(233,238,233,0.035) 0px, rgba(233,238,233,0.035) 1px, transparent 1px, transparent 3px);
+  }
+  .grid-overlay{
+    position:absolute; inset:0; pointer-events:none; z-index:5; opacity:0.06;
+    background-image:linear-gradient(var(--teal) 1px, transparent 1px), linear-gradient(90deg, var(--teal) 1px, transparent 1px);
+    background-size:44px 44px;
+  }
+
+  /* ---------- Drone ---------- */
+  /* .drone-wrap fills the stage so translate() below is expressed as a % of
+     stage size — GPU-composited, unlike animating left/top (forces layout
+     recalculation every frame). */
+  .drone-wrap{
+    position:absolute; inset:0; z-index:20;
+    animation:flyPath 13s linear infinite;
+    will-change:transform;
+  }
+  @keyframes flyPath{
+    0%{ transform:translate(-14%, 34%); }
+    45%{ transform:translate(38%, 20%); }
+    60%{ transform:translate(52%, 24%); }
+    100%{ transform:translate(118%, 12%); }
+  }
+  .drone-bob{ position:absolute; top:0; left:0; animation:bob 1.6s ease-in-out infinite; }
+  @keyframes bob{ 0%,100%{transform:translateY(0) rotate(-1.5deg);} 50%{transform:translateY(-7px) rotate(1.5deg);} }
+  .drone-wrap svg{ width:104px; height:auto; }
+  .rotor{ transform-origin:center; animation:spin 0.5s linear infinite; }
+  @keyframes spin{ from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+  .beacon{ animation:beacon 1s ease-in-out infinite; }
+  @keyframes beacon{ 0%,100%{opacity:0.2;} 50%{opacity:1;} }
+
+  /* ---------- Thermal reticle + reveal ---------- */
+  .reticle-track{
+    position:absolute; inset:0; z-index:15;
+    animation:trackMove 13s linear infinite;
+    will-change:transform;
+  }
+  @keyframes trackMove{
+    0%{ transform:translate(-8%, 8%); }
+    45%{ transform:translate(34%, -2%); }
+    60%{ transform:translate(46%, 2%); }
+    100%{ transform:translate(112%, -8%); }
+  }
+  .reticle{
+    position:absolute; top:58%; left:0;
+    width:230px; height:230px;
+    transform:translate(-50%,-50%);
+  }
+  .thermal-disc{
+    position:absolute; inset:0; border-radius:50%;
+    overflow:hidden;
+    box-shadow:0 0 0 2px rgba(79,193,180,0.55), 0 0 40px rgba(79,193,180,0.25);
+    opacity:0.94;
+  }
+  .thermal-disc::before{
+    content:"";
+    position:absolute; inset:-40%;
+    background:
+      radial-gradient(circle at 52% 60%, var(--thermal-hot) 0%, var(--thermal-hot) 6%, var(--thermal-mid) 16%, #58124a 30%, var(--thermal-cold) 55%, #05030f 100%);
+  }
+  .thermal-disc::after{
+    content:"";
+    position:absolute; inset:0;
+    background:repeating-radial-gradient(circle at 50% 50%, transparent 0, transparent 18px, rgba(255,255,255,0.02) 19px);
+  }
+  .reticle-ring{ position:absolute; inset:0; border-radius:50%; border:1px solid rgba(233,238,233,0.25); }
+  .reticle-cross{ position:absolute; inset:0; }
+  .reticle-cross i{ position:absolute; background:rgba(233,238,233,0.35); }
+  .reticle-cross .h{ top:50%; left:8%; right:8%; height:1px; transform:translateY(-50%); }
+  .reticle-cross .v{ left:50%; top:8%; bottom:8%; width:1px; transform:translateX(-50%); }
+  .reticle-corners span{ position:absolute; width:14px; height:14px; border:2px solid var(--teal); }
+  .reticle-corners .tl{ top:-4px; left:-4px; border-right:none; border-bottom:none; }
+  .reticle-corners .tr{ top:-4px; right:-4px; border-left:none; border-bottom:none; }
+  .reticle-corners .bl{ bottom:-4px; left:-4px; border-right:none; border-top:none; }
+  .reticle-corners .br{ bottom:-4px; right:-4px; border-left:none; border-top:none; }
+
+  /* ---------- HUD frame ---------- */
+  .hud{ position:absolute; inset:0; z-index:50; pointer-events:none; font-family:var(--font-mono); }
+  .hud-corner{ position:absolute; width:34px; height:34px; }
+  .hud-corner::before, .hud-corner::after{ content:""; position:absolute; background:var(--text-dim); opacity:0.55; }
+  .hud-corner::before{ width:100%; height:1.5px; }
+  .hud-corner::after{ height:100%; width:1.5px; }
+  .hud-corner.tl{ top:16px; left:16px; } .hud-corner.tl::before{top:0;} .hud-corner.tl::after{left:0;}
+  .hud-corner.tr{ top:16px; right:16px; } .hud-corner.tr::before{top:0;right:0;width:100%;} .hud-corner.tr::after{right:0;}
+  .hud-corner.bl{ bottom:16px; left:16px; } .hud-corner.bl::before{bottom:0;} .hud-corner.bl::after{left:0;bottom:0;height:100%;}
+  .hud-corner.br{ bottom:16px; right:16px; } .hud-corner.br::before{bottom:0;right:0;} .hud-corner.br::after{right:0;bottom:0;height:100%;}
+
+  .hud-top{
+    position:absolute; top:20px; left:56px; right:56px;
+    display:flex; justify-content:space-between; align-items:flex-start;
+    font-size:11.5px; letter-spacing:0.06em; color:var(--text-dim);
+  }
+  .hud-top .rec{ display:flex; align-items:center; gap:8px; color:var(--accent); font-weight:600; }
+  .rec-dot{ width:7px; height:7px; border-radius:50%; background:var(--accent); box-shadow:0 0 8px var(--accent-glow); animation:beacon 1s ease-in-out infinite; }
+  .hud-top .link{ text-align:right; }
+  .link-bad{ color:var(--accent); }
+
+  .hud-bottom{
+    position:absolute; bottom:18px; left:56px; right:56px;
+    display:flex; justify-content:space-between; align-items:flex-end;
+    font-size:11px; color:var(--text-dim);
+  }
+  .telemetry{ display:flex; gap:22px; }
+  .telemetry div{ display:flex; flex-direction:column; gap:3px; }
+  .telemetry .k{ color:var(--text-faint); letter-spacing:0.08em; font-size:9.5px; text-transform:uppercase; }
+  .telemetry .v{ color:var(--text); font-size:13px; font-variant-numeric:tabular-nums; }
+  .telemetry .v b{ color:var(--teal); font-weight:600; }
+  .brand-tag{ display:flex; align-items:center; gap:8px; font-family:var(--font-display); color:var(--text); font-size:13px; letter-spacing:0.02em; }
+  .brand-tag .dot{ width:6px; height:6px; border-radius:50%; background:var(--teal); }
+  .brand-tag span{ color:var(--accent); }
+
+  /* ---------- Sitrep title (opening) ---------- */
+  .sitrep{
+    position:absolute; top:52px; left:56px; z-index:45;
+    font-family:var(--font-display); font-weight:700;
+    animation:titleShow 13s linear infinite;
+  }
+  .sitrep .eyebrow{ font-family:var(--font-mono); font-size:11px; letter-spacing:0.16em; color:var(--teal); text-transform:uppercase; margin-bottom:6px; }
+  .sitrep h1{ font-size:28px; color:var(--text); line-height:1.15; max-width:460px; text-wrap:balance; }
+  @keyframes titleShow{
+    0%{ opacity:0; transform:translateY(-6px); }
+    4%{ opacity:1; transform:translateY(0); }
+    16%{ opacity:1; }
+    22%{ opacity:0; transform:translateY(-6px); }
+    100%{ opacity:0; }
+  }
+
+  /* ---------- Detection callout (shares the reticle's coordinate frame) ---------- */
+  .callout{
+    position:absolute; z-index:46;
+    top:50%; left:115px;
+    transform:translateY(-50%);
+    animation:calloutShow 13s linear infinite;
+  }
+  @keyframes calloutShow{
+    0%,58%{ opacity:0; }
+    62%{ opacity:1; }
+    92%{ opacity:1; }
+    97%{ opacity:0; }
+    100%{ opacity:0; }
+  }
+  .callout-box{
+    position:relative;
+    background:rgba(16,25,21,0.92);
+    border:1px solid var(--accent-dim);
+    border-radius:8px;
+    padding:12px 16px;
+    min-width:220px;
+    box-shadow:0 14px 30px -10px rgba(0,0,0,0.6);
+  }
+  .callout-box::before{
+    content:""; position:absolute; left:-70px; top:50%;
+    width:70px; height:1px; background:var(--accent-dim);
+  }
+  .callout-head{ display:flex; align-items:center; gap:7px; margin-bottom:6px; }
+  .callout-head .pulse{ width:7px; height:7px; border-radius:50%; background:var(--accent); box-shadow:0 0 10px var(--accent-glow); animation:beacon 0.8s ease-in-out infinite; }
+  .callout-head span{ font-family:var(--font-mono); font-size:11px; letter-spacing:0.1em; color:var(--accent); text-transform:uppercase; font-weight:600; }
+  .callout-body{ font-family:var(--font-mono); font-size:11.5px; color:var(--text-dim); display:flex; flex-direction:column; gap:3px; }
+  .callout-body b{ color:var(--text); font-weight:500; }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration:0.001ms !important; animation-iteration-count:1 !important; }
+  }
+
+  @media (max-width:640px){
+    .sitrep h1{ font-size:19px; }
+    .hud-top, .hud-bottom{ left:40px; right:40px; }
+    .telemetry{ gap:12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage-shell">
+  <div class="stage" id="stage">
+
+    <div class="sky">
+      <div class="stars" id="stars"></div>
+    </div>
+
+    <div class="grid-overlay"></div>
+
+    <!-- Parallax ridgelines -->
+    <div class="ridge ridge-far" style="bottom:26%;">
+      <svg viewBox="0 0 1400 220" preserveAspectRatio="none"><path d="M0,220 L0,140 L120,95 L260,150 L400,70 L560,130 L720,60 L900,145 L1060,90 L1220,150 L1400,110 L1400,220 Z" fill="#0D1912"/></svg>
+    </div>
+    <div class="ridge ridge-mid" style="bottom:12%;">
+      <svg viewBox="0 0 1400 220" preserveAspectRatio="none"><path d="M0,220 L0,170 L150,110 L320,175 L480,100 L650,165 L820,90 L980,160 L1160,120 L1400,170 L1400,220 Z" fill="#0F1D15"/></svg>
+    </div>
+    <div class="ridge ridge-near" style="bottom:0;">
+      <svg viewBox="0 0 1400 200" preserveAspectRatio="none"><path d="M0,200 L0,150 L100,120 L220,160 L360,110 L520,155 L680,100 L860,150 L1020,115 L1200,155 L1400,130 L1400,200 Z" fill="#141F17"/></svg>
+    </div>
+
+    <!-- Thermal scan disc travelling with drone -->
+    <div class="reticle-track">
+      <div class="reticle">
+        <div class="thermal-disc"></div>
+        <div class="reticle-ring"></div>
+        <div class="reticle-cross"><i class="h"></i><i class="v"></i></div>
+        <div class="reticle-corners"><span class="tl"></span><span class="tr"></span><span class="bl"></span><span class="br"></span></div>
+
+        <div class="callout">
+          <div class="callout-box">
+            <div class="callout-head"><span class="pulse"></span><span>Survivor Detected</span></div>
+            <div class="callout-body">
+              <div>Conf. <b>97.4%</b> — thermal + visual fusion</div>
+              <div>27.06°N, 88.41°E · alt 42m</div>
+              <div>Relaying to incident commander…</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Drone -->
+    <div class="drone-wrap">
+      <div class="drone-bob">
+        <svg viewBox="0 0 120 70" xmlns="http://www.w3.org/2000/svg">
+          <g stroke="#5E7168" stroke-width="2">
+            <line x1="60" y1="35" x2="20" y2="14"/>
+            <line x1="60" y1="35" x2="100" y2="14"/>
+            <line x1="60" y1="35" x2="20" y2="56"/>
+            <line x1="60" y1="35" x2="100" y2="56"/>
+          </g>
+          <g class="rotor" style="transform-origin:20px 14px;"><ellipse cx="20" cy="14" rx="16" ry="3.4" fill="#A9B8AF" opacity="0.55"/></g>
+          <g class="rotor" style="transform-origin:100px 14px;"><ellipse cx="100" cy="14" rx="16" ry="3.4" fill="#A9B8AF" opacity="0.55"/></g>
+          <g class="rotor" style="transform-origin:20px 56px;"><ellipse cx="20" cy="56" rx="16" ry="3.4" fill="#A9B8AF" opacity="0.55"/></g>
+          <g class="rotor" style="transform-origin:100px 56px;"><ellipse cx="100" cy="56" rx="16" ry="3.4" fill="#A9B8AF" opacity="0.55"/></g>
+          <circle cx="20" cy="14" r="4" fill="#141F1A" stroke="#5E7168" stroke-width="1.5"/>
+          <circle cx="100" cy="14" r="4" fill="#141F1A" stroke="#5E7168" stroke-width="1.5"/>
+          <circle cx="20" cy="56" r="4" fill="#141F1A" stroke="#5E7168" stroke-width="1.5"/>
+          <circle cx="100" cy="56" r="4" fill="#141F1A" stroke="#5E7168" stroke-width="1.5"/>
+          <rect x="42" y="26" width="36" height="20" rx="6" fill="#141F1A" stroke="#4FC1B4" stroke-width="1.5"/>
+          <circle cx="60" cy="46" r="4" fill="#0A100E" stroke="#FF7A3D" stroke-width="1.5"/>
+          <circle class="beacon" cx="70" cy="30" r="2" fill="#FF7A3D"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="vignette"></div>
+    <div class="scanlines"></div>
+
+    <!-- Opening title -->
+    <div class="sitrep">
+      <div class="eyebrow">Daksha // Autonomous Flight — Sim</div>
+      <h1>Grid Sector 7 — network offline.<br>Onboard AI is flying the search.</h1>
+    </div>
+
+    <!-- HUD frame -->
+    <div class="hud">
+      <div class="hud-corner tl"></div>
+      <div class="hud-corner tr"></div>
+      <div class="hud-corner bl"></div>
+      <div class="hud-corner br"></div>
+
+      <div class="hud-top">
+        <div class="rec"><span class="rec-dot"></span>LIVE · ONBOARD FEED</div>
+        <div class="link">
+          <div>MESH LINK <span class="link-bad">OFFLINE — AUTONOMOUS</span></div>
+        </div>
+      </div>
+
+      <div class="hud-bottom">
+        <div class="telemetry">
+          <div><span class="k">Alt</span><span class="v"><b>118</b> m</span></div>
+          <div><span class="k">Spd</span><span class="v"><b>11.4</b> m/s</span></div>
+          <div><span class="k">Batt</span><span class="v"><b>68</b>%</span></div>
+          <div><span class="k">Mode</span><span class="v">Autonomous Search</span></div>
+        </div>
+        <div class="brand-tag"><span class="dot"></span>DAKSHA<span> AI</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const starsEl = document.getElementById('stars');
+  const n = 46;
+  let html = '';
+  for (let i = 0; i < n; i++) {
+    const x = Math.random() * 100;
+    const y = Math.random() * 100;
+    const delay = (Math.random() * 3.4).toFixed(2);
+    const size = Math.random() < 0.15 ? 3 : 2;
+    html += `<span class="star" style="left:${x}%; top:${y}%; width:${size}px; height:${size}px; animation-delay:${delay}s;"></span>`;
+  }
+  starsEl.innerHTML = html;
+</script>
+
+</body>
+</html>

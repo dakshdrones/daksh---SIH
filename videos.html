@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daksha Mission Reel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Expanded:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#0A100E;
+    --bg-raised:#101915;
+    --bg-card:#141F1A;
+    --line:#233129;
+    --text:#E9EEE9;
+    --text-dim:#A9B8AF;
+    --text-faint:#5E7168;
+    --accent:#FF7A3D;
+    --accent-dim:#C9602F;
+    --accent-glow:rgba(255,122,61,0.28);
+    --teal:#4FC1B4;
+    --teal-dim:#2F8B80;
+    --font-display:'Archivo Expanded','Arial Narrow',sans-serif;
+    --font-body:'IBM Plex Sans',Arial,sans-serif;
+    --font-mono:'IBM Plex Mono','Courier New',monospace;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{background:var(--bg);}
+  body{
+    background:var(--bg); color:var(--text); font-family:var(--font-body);
+    min-height:100vh; padding:36px 24px 60px;
+  }
+  a{color:var(--accent);}
+  .wrap{max-width:1080px; margin:0 auto;}
+
+  header{margin-bottom:28px;}
+  .eyebrow{
+    font-family:var(--font-mono); font-size:12px; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--teal); display:flex; align-items:center; gap:10px; margin-bottom:10px;
+  }
+  .eyebrow::before{content:""; width:7px; height:7px; background:var(--teal); border-radius:50%; box-shadow:0 0 8px rgba(79,193,180,0.4);}
+  h1{font-family:var(--font-display); font-weight:700; font-size:clamp(26px,4vw,36px); letter-spacing:-0.01em;}
+  .sub{color:var(--text-dim); font-size:15px; margin-top:8px; max-width:560px;}
+
+  .layout{
+    display:flex; flex-direction:column; gap:24px; margin-top:32px;
+  }
+
+  .player-card{
+    background:var(--bg-raised); border:1px solid var(--line); border-radius:12px; overflow:hidden;
+  }
+  .player-frame{ position:relative; background:#000; aspect-ratio:16/9; cursor:pointer; }
+  .player-frame:fullscreen{ aspect-ratio:auto; width:100vw; height:100vh; }
+  video, iframe{ width:100%; height:100%; display:block; background:#000; border:0; }
+  video[hidden], iframe[hidden]{ display:none; }
+
+  .player-control-btn{
+    position:absolute; bottom:14px; z-index:12;
+    width:38px; height:38px; border-radius:8px;
+    background:rgba(16,25,21,0.78); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    opacity:0; transition:opacity 0.15s, border-color 0.15s;
+  }
+  .player-frame:hover .player-control-btn, .player-control-btn:focus-visible{ opacity:1; }
+  .player-frame:fullscreen .player-control-btn{ opacity:1; }
+  .player-frame:-webkit-full-screen .player-control-btn{ opacity:1; }
+  .player-frame.is-fullscreen .player-control-btn{ opacity:1; }
+  .player-control-btn:hover{ border-color:var(--accent-dim); }
+  .player-control-btn:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .player-control-btn svg{ width:18px; height:18px; fill:none; stroke:var(--text); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .prev-btn{ left:14px; }
+  .prev-btn svg{ fill:var(--text); stroke:none; }
+  .next-btn{ right:60px; }
+  .next-btn svg{ fill:var(--text); stroke:none; }
+  .fullscreen-btn{ right:14px; }
+
+  .playlist{
+    background:var(--bg-raised); border:1px solid var(--line); border-radius:12px;
+    padding:8px;
+    position:sticky; bottom:16px; z-index:20;
+    box-shadow:0 20px 40px -20px rgba(0,0,0,0.6);
+  }
+  .playlist-head{
+    font-family:var(--font-mono); font-size:11px; letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--text-faint); padding:10px 12px 4px;
+  }
+  .playlist-items{
+    display:grid; grid-template-columns:repeat(5, 1fr); gap:6px;
+  }
+  @media (max-width:900px){ .playlist-items{ grid-template-columns:repeat(3, 1fr); } }
+  @media (max-width:560px){ .playlist-items{ grid-template-columns:repeat(2, 1fr); } }
+  .item{
+    display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:8px;
+    cursor:pointer; border:1px solid transparent; transition:background 0.15s, border-color 0.15s;
+  }
+  .item:hover{ background:var(--bg-card); }
+  .item.active{ background:var(--bg-card); border-color:var(--accent-dim); }
+  .item .num{
+    font-family:var(--font-mono); font-size:12px; color:var(--text-faint);
+    width:22px; height:22px; border-radius:50%; border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .item.active .num{ color:var(--accent); border-color:var(--accent-dim); }
+  .item.done .num{ color:var(--teal); border-color:var(--teal-dim); }
+  .item.done .num::before{ content:"✓"; }
+  .item-text{ min-width:0; flex:1; }
+  .item-title{ font-size:13.5px; font-weight:500; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .item.active .item-title{ color:var(--accent); }
+  .item-sub{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); margin-top:2px; }
+
+  footer{
+    margin-top:28px; font-family:var(--font-mono); font-size:12px; color:var(--text-faint);
+    letter-spacing:0.02em;
+  }
+
+  #gate{
+    position:fixed; inset:0; z-index:100;
+    background:var(--bg);
+    display:flex; align-items:center; justify-content:center;
+    padding:24px;
+  }
+  .gate-box{
+    width:100%; max-width:330px;
+    background:var(--bg-card); border:1px solid var(--line);
+    border-radius:10px; padding:26px 22px; text-align:center;
+  }
+  .gate-title{
+    font-family:var(--font-display); font-size:17px;
+    letter-spacing:0.03em; text-transform:uppercase; margin-bottom:18px;
+  }
+  .gate-title span{ color:var(--accent); }
+  .gate-label{
+    font-family:var(--font-mono); font-size:11px; letter-spacing:0.06em;
+    text-transform:uppercase; color:var(--text-faint); margin-bottom:10px;
+  }
+  #gateInput{
+    width:100%; text-align:center;
+    font-family:var(--font-mono); font-size:18px; letter-spacing:0.35em;
+    background:var(--bg-raised); color:var(--text);
+    border:1px solid var(--line); border-radius:6px;
+    padding:10px 12px; margin-bottom:12px;
+  }
+  #gateInput:focus{ outline:none; border-color:var(--accent); }
+  #gateBtn{
+    width:100%; cursor:pointer;
+    font-family:var(--font-mono); font-size:12px; font-weight:600;
+    letter-spacing:0.04em; text-transform:uppercase;
+    background:var(--accent); color:#160B06;
+    border:1px solid var(--accent); border-radius:6px; padding:10px 14px;
+  }
+  #gateError{
+    font-family:var(--font-mono); font-size:11px;
+    color:var(--accent); margin-top:12px;
+  }
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="gate-box">
+    <div class="gate-title">Daksha <span>Mission Reel</span></div>
+    <div class="gate-label">Enter access code</div>
+    <input id="gateInput" type="password" inputmode="numeric" autocomplete="off">
+    <button id="gateBtn" type="button">Unlock</button>
+    <div id="gateError" hidden>Incorrect code</div>
+  </div>
+</div>
+
+<div class="wrap">
+  <header>
+    <h1>Flight sequence, part by part</h1>
+  </header>
+
+  <div class="layout">
+    <div class="player-card">
+      <div class="player-frame" id="playerFrame">
+        <video id="player" playsinline>
+          <source id="videoSource" src="" type="video/mp4">
+        </video>
+        <iframe id="demoFrame" hidden title="Animated flight demo"></iframe>
+        <button class="player-control-btn prev-btn" id="prevBtn" type="button" aria-label="Previous part">
+          <svg viewBox="0 0 24 24"><path d="M18 4L8 12l10 8V4zM6 4h2v16H6z"/></svg>
+        </button>
+        <button class="player-control-btn next-btn" id="nextBtn" type="button" aria-label="Next part">
+          <svg viewBox="0 0 24 24"><path d="M6 4l10 8-10 8V4zM18 4h2v16h-2z"/></svg>
+        </button>
+        <button class="player-control-btn fullscreen-btn" id="fullscreenBtn" type="button" aria-label="Toggle fullscreen">
+          <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <nav class="playlist" id="playlist" aria-label="Video playlist"></nav>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  // Gate only — this code sits in the page source, so it keeps casual visitors
+  // out but is not real access control.
+  const ACCESS_CODE = '1001';
+  const gate = document.getElementById('gate');
+  const input = document.getElementById('gateInput');
+  const error = document.getElementById('gateError');
+
+  function submit(){
+    if (input.value.trim() === ACCESS_CODE){
+      gate.remove();
+      return;
+    }
+    error.hidden = false;
+    input.value = '';
+    input.focus();
+  }
+
+  document.getElementById('gateBtn').addEventListener('click', submit);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+  input.focus();
+})();
+</script>
+
+<script>
+  const parts = [
+    { type: "iframe", file: "drone-demo.html", num: "0", title: "Part 0", desc: "Animated flight demo" },
+    { type: "video", file: "video/Part - 1.mp4", num: "1", title: "Part 1", desc: "Here's how the drone flies" },
+    { type: "video", file: "video/Part - 2.mp4", num: "2", title: "Part 2", desc: "Drone finding someone" },
+    { type: "video", file: "video/Part - 3.mp4", num: "3", title: "Part 3", desc: "Notifying the incharge" },
+    { type: "video", file: "video/Part - 4.mp4", num: "4", title: "Part 4", desc: "Rescue taking place" },
+  ];
+
+  const player = document.getElementById('player');
+  const source = document.getElementById('videoSource');
+  const demoFrame = document.getElementById('demoFrame');
+  const playlistEl = document.getElementById('playlist');
+  const playerFrame = document.getElementById('playerFrame');
+
+  let current = 0;
+  const completed = new Set();
+
+  function renderPlaylist(){
+    playlistEl.innerHTML = '<div class="playlist-items">' + parts.map((p, i) => `
+      <div class="item ${i===current ? 'active' : ''} ${completed.has(i) ? 'done' : ''}" data-idx="${i}">
+        <span class="num">${p.num}</span>
+        <div class="item-text">
+          <div class="item-title">${p.title}</div>
+          <div class="item-sub">${p.desc}</div>
+        </div>
+      </div>
+    `).join('') + '</div>';
+    playlistEl.querySelectorAll('.item').forEach(el => {
+      el.addEventListener('click', () => load(parseInt(el.dataset.idx, 10), true));
+    });
+  }
+
+  function load(idx, autoplay){
+    current = ((idx % parts.length) + parts.length) % parts.length;
+    const part = parts[current];
+
+    if (part.type === 'iframe') {
+      player.pause();
+      source.src = '';
+      player.hidden = true;
+      demoFrame.hidden = false;
+      demoFrame.src = part.file;
+      playerFrame.style.cursor = 'default';
+    } else {
+      demoFrame.hidden = true;
+      demoFrame.src = '';
+      player.hidden = false;
+      source.src = part.file;
+      player.load();
+      playerFrame.style.cursor = 'pointer';
+      if (autoplay) {
+        player.play().catch(() => {});
+      }
+    }
+    renderPlaylist();
+  }
+
+  function togglePlay(){
+    if (player.hidden) return;
+    if (player.paused) player.play().catch(() => {});
+    else player.pause();
+  }
+
+  playerFrame.addEventListener('click', togglePlay);
+
+  const prevBtn = document.getElementById('prevBtn');
+  prevBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    load(current - 1, true);
+  });
+
+  const nextBtn = document.getElementById('nextBtn');
+  nextBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    load(current + 1, true);
+  });
+
+  const fullscreenBtn = document.getElementById('fullscreenBtn');
+  fullscreenBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      playerFrame.requestFullscreen().catch(() => {});
+    }
+  });
+
+  document.addEventListener('fullscreenchange', () => {
+    playerFrame.classList.toggle('is-fullscreen', !!document.fullscreenElement);
+  });
+
+  player.addEventListener('ended', () => {
+    completed.add(current);
+    if (current < parts.length - 1) {
+      load(current + 1, true);
+    } else {
+      renderPlaylist();
+    }
+  });
+
+  load(0, false);
+</script>
+
+</body>
+</html>

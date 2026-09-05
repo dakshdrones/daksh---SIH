@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daksha Detection Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Expanded:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    /* instrument housing — cold near-black, faintly cyan */
+    --ink:#05090A;
+    --panel:#0A1113;
+    --panel-2:#0E171A;
+    --rule:#17262A;
+    --rule-lit:#22383D;
+    --text:#DCE6E6;
+    --dim:#61787F;
+    --faint:#3C4E54;
+    /* each colour means exactly one thing */
+    --hot:#FF7A3D;     /* heat / a detected person */
+    --cold:#2F6BD8;    /* scene / no heat */
+    --live:#4FC1B4;    /* system state */
+    --alert:#FF5C4D;
+
+    --display:'Archivo Expanded','Arial Narrow',sans-serif;
+    --sans:'IBM Plex Sans',Arial,sans-serif;
+    /* mono is the interface voice: readouts update 30x/sec and must not jitter */
+    --mono:'IBM Plex Mono','Courier New',monospace;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{background:var(--ink);}
+  body{
+    background:var(--ink); color:var(--text);
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+    min-height:100vh;
+    padding:26px 22px 56px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .console{max-width:1120px; margin:0 auto;}
+  .deck{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 290px;
+    gap:16px; align-items:stretch;
+  }
+  .deck-main{min-width:0;}
+
+  /* ---------- instrument slab ---------- */
+  .slab{
+    border:1px solid var(--rule);
+    background:var(--panel);
+    border-radius:3px;
+    overflow:hidden;
+  }
+
+  /* OSD strip, pinned to the top edge of the image like a real imager */
+  .osd{
+    display:flex; align-items:center; gap:12px;
+    padding:11px 14px;
+    font-size:10.5px; letter-spacing:0.16em; text-transform:uppercase;
+    color:var(--dim);
+    border-bottom:1px solid var(--rule);
+    background:var(--panel-2);
+  }
+  .mark{
+    font-family:var(--display); font-weight:700;
+    font-size:12px; letter-spacing:0.08em; color:var(--text);
+  }
+  .osd .sep{color:var(--faint);}
+  .osd .spacer{margin-left:auto;}
+  .osd .field{color:var(--faint);}
+  .osd .field b{color:var(--dim); font-weight:500;}
+
+  .state{
+    display:inline-flex; align-items:center; gap:7px;
+    color:var(--dim);
+  }
+  .pip{
+    width:6px; height:6px; border-radius:50%;
+    background:var(--faint); flex:none;
+  }
+  .state.is-live{color:var(--live);}
+  .state.is-live .pip{background:var(--live); animation:breathe 1.6s ease-in-out infinite;}
+  @keyframes breathe{ 0%,100%{opacity:1;} 50%{opacity:0.28;} }
+
+  /* ---------- viewport ---------- */
+  .viewport{
+    position:relative;
+    background:#000;
+    aspect-ratio:16 / 9;
+    max-height:62vh;
+    overflow:hidden;
+  }
+  video, canvas{
+    position:absolute; inset:0;
+    display:block; width:100%; height:100%;
+    object-fit:cover;
+  }
+  #video{transform:scaleX(-1); visibility:hidden;}
+  #thermalCanvas{transform:scaleX(-1);}
+
+  /* corner brackets — the frame reads as an optic, not a card. Above the
+     standby layer so the instrument is framed whether or not the feed is on. */
+  .corner{position:absolute; width:22px; height:22px; pointer-events:none; z-index:4; opacity:0.75;}
+  .corner::before,.corner::after{content:''; position:absolute; background:var(--dim);}
+  .corner::before{width:100%; height:1px;}
+  .corner::after{width:1px; height:100%;}
+  .corner.tl{top:12px; left:12px;}
+  .corner.tr{top:12px; right:12px;}
+  .corner.tr::before{right:0;} .corner.tr::after{right:0;}
+  .corner.bl{bottom:12px; left:12px;}
+  .corner.bl::before{bottom:0;} .corner.bl::after{bottom:0;}
+  .corner.br{bottom:12px; right:12px;}
+  .corner.br::before{right:0; bottom:0;} .corner.br::after{right:0; bottom:0;}
+
+  .standby{
+    position:absolute; inset:0; z-index:3;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:9px;
+    text-align:center; padding:20px;
+    background:
+      radial-gradient(ellipse 60% 60% at 50% 50%, #0B1416 0%, #05090A 100%);
+  }
+  .standby-t{
+    font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:var(--dim);
+  }
+  .standby-s{font-family:var(--sans); font-size:14px; color:var(--faint); letter-spacing:0;}
+  .viewport.is-running .standby{display:none;}
+
+  /* ---------- readout strip under the image ---------- */
+  .readout{
+    display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+    padding:11px 14px;
+    border-top:1px solid var(--rule);
+    background:var(--panel-2);
+    font-size:10.5px; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--faint);
+  }
+  /* two-state key, not a gradient ramp: the render is a classifier, not a
+     temperature scale, so a continuous ramp would misrepresent it */
+  .key{display:inline-flex; align-items:center; gap:8px;}
+  .key i{width:11px; height:11px; border-radius:2px; flex:none;}
+  /* swatches use the midpoint of each render ramp, so the key matches the image */
+  .key .scene{background:linear-gradient(180deg,#0E2A6B,#346AD0);}
+  .key .person{background:linear-gradient(180deg,#CD1610,#FF3A26);}
+  .count{margin-left:auto; color:var(--dim);}
+  .count b{
+    font-size:15px; font-weight:600; color:var(--text);
+    letter-spacing:0; margin-right:5px;
+  }
+  .count.has-people b{color:var(--hot);}
+
+  /* ---------- controls ---------- */
+  .bar{display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-top:14px;}
+  .btn{
+    font-family:var(--mono); font-size:11.5px; font-weight:500;
+    letter-spacing:0.11em; text-transform:uppercase;
+    background:transparent; color:var(--text);
+    border:1px solid var(--rule-lit); border-radius:3px;
+    padding:11px 17px; cursor:pointer;
+    transition:border-color .14s ease, background .14s ease, color .14s ease;
+  }
+  .btn:hover:not(:disabled){border-color:var(--dim); background:var(--panel-2);}
+  .btn:focus-visible{outline:2px solid var(--live); outline-offset:2px;}
+  .btn:disabled{opacity:0.32; cursor:not-allowed;}
+  .btn.primary{background:var(--hot); border-color:var(--hot); color:#180A03; font-weight:600;}
+  .btn.primary:hover:not(:disabled){background:#ff9058; border-color:#ff9058;}
+  .btn.toggle{display:inline-flex; align-items:center; gap:8px;}
+  .btn.toggle .pip{background:var(--faint);}
+  .btn.toggle.is-on{border-color:var(--rule-lit); color:var(--text);}
+  .btn.toggle.is-on .pip{background:var(--hot);}
+  .msg{font-size:11.5px; color:var(--alert); letter-spacing:0.02em;}
+  .msg:empty{display:none;}
+
+  /* ---------- tracks rail ---------- */
+  .rail{
+    border:1px solid var(--rule); background:var(--panel);
+    border-radius:3px; padding:0;
+    display:flex; flex-direction:column; min-height:0;
+  }
+  .rail-head{
+    display:flex; align-items:center; gap:8px;
+    padding:11px 14px; border-bottom:1px solid var(--rule);
+    background:var(--panel-2);
+    font-size:10.5px; letter-spacing:0.16em; text-transform:uppercase; color:var(--dim);
+  }
+  .rail-head .n{margin-left:auto; color:var(--faint);}
+  .track-list{overflow-y:auto; min-height:0; padding:0 14px;}
+
+  .track{padding:11px 0; border-bottom:1px solid var(--rule);}
+  .track:last-child{border-bottom:0;}
+  .track-top{display:flex; align-items:baseline; gap:10px;}
+  .t-id{color:var(--hot); font-size:12px; font-weight:600;}
+  .t-range{font-size:13.5px; color:var(--text);}
+  .t-conf{margin-left:auto; font-size:11px; color:var(--dim);}
+  .track-sub{
+    font-size:10.5px; color:var(--faint); margin-top:4px;
+    letter-spacing:0.08em; text-transform:uppercase;
+  }
+  .none{
+    color:var(--faint); padding:26px 0; text-align:center;
+    letter-spacing:0.14em; text-transform:uppercase; font-size:10.5px;
+  }
+
+  @media (max-width:900px){
+    .deck{grid-template-columns:1fr;}
+    .track-list{max-height:220px;}
+  }
+  @media (max-width:620px){
+    body{padding:18px 14px 40px;}
+    .osd{flex-wrap:wrap; gap:8px 12px;}
+    .osd .spacer{margin-left:0; width:100%;}
+    .viewport{aspect-ratio:1 / 1;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none !important; transition:none !important;}
+  }
+
+  /* ---------- access gate ---------- */
+  #gate{
+    position:fixed; inset:0; z-index:100;
+    background:var(--ink);
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .gate-box{
+    width:100%; max-width:310px;
+    border:1px solid var(--rule); background:var(--panel);
+    border-radius:3px; padding:26px 22px; text-align:center;
+  }
+  .gate-mark{
+    font-family:var(--display); font-weight:700; font-size:13px;
+    letter-spacing:0.08em; text-transform:uppercase; margin-bottom:4px;
+  }
+  .gate-sub{
+    font-size:10px; letter-spacing:0.2em; text-transform:uppercase;
+    color:var(--faint); margin-bottom:20px;
+  }
+  #gateInput{
+    width:100%; text-align:center;
+    font-family:var(--mono); font-size:17px; letter-spacing:0.4em;
+    background:var(--ink); color:var(--text);
+    border:1px solid var(--rule-lit); border-radius:3px;
+    padding:11px 12px; margin-bottom:10px;
+  }
+  #gateInput:focus{outline:none; border-color:var(--hot);}
+  #gateBtn{width:100%;}
+  #gateError{font-size:11px; color:var(--alert); margin-top:12px; letter-spacing:0.02em;}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="gate-box">
+    <div class="gate-mark">Daksha</div>
+    <div class="gate-sub">Detection console</div>
+    <input id="gateInput" type="password" inputmode="numeric" autocomplete="off" aria-label="Access code">
+    <button id="gateBtn" class="btn primary" type="button">Unlock</button>
+    <div id="gateError" hidden>Wrong code. Try again.</div>
+  </div>
+</div>
+
+<main class="console">
+ <div class="deck">
+  <div class="deck-main">
+
+  <div class="slab" id="slab">
+    <div class="osd">
+      <span class="mark">Daksha</span>
+      <span class="sep">/</span>
+      <span>Thermal detection</span>
+      <span class="spacer"></span>
+      <span class="field">src <b id="osdRes">—</b></span>
+      <span class="field">fps <b id="osdFps">—</b></span>
+      <span class="state" id="stateChip"><i class="pip"></i><span id="stateText">Standby</span></span>
+    </div>
+
+    <div class="viewport" id="viewport">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="thermalCanvas"></canvas>
+      <canvas id="overlay"></canvas>
+      <i class="corner tl"></i><i class="corner tr"></i>
+      <i class="corner bl"></i><i class="corner br"></i>
+      <div class="standby">
+        <div class="standby-t">Feed off</div>
+        <div class="standby-s">Start the feed to begin detecting people.</div>
+      </div>
+    </div>
+
+    <div class="readout">
+      <span class="key"><i class="scene"></i>Scene</span>
+      <span class="key"><i class="person"></i>Person</span>
+      <span class="count" id="count"><b id="countNum">0</b>in frame</span>
+    </div>
+  </div>
+
+  <div class="bar">
+    <button id="startBtn" class="btn primary" type="button">Start feed</button>
+    <button id="stopBtn" class="btn" type="button" disabled>Stop feed</button>
+    <button id="thermalBtn" class="btn toggle is-on" type="button" disabled aria-pressed="true">
+      <i class="pip"></i>Thermal
+    </button>
+    <span class="msg" id="msg"></span>
+  </div>
+
+  </div>
+
+  <aside class="rail">
+    <div class="rail-head">
+      <span>Tracks</span>
+      <span class="n" id="railCount">—</span>
+    </div>
+    <div class="track-list" id="detectionRows">
+      <p class="none">No people in frame</p>
+    </div>
+  </aside>
+ </div>
+</main>
+
+<script>
+(function(){
+  // Gate only — this code sits in the page source, so it keeps casual visitors
+  // out but is not real access control.
+  const ACCESS_CODE = '1001';
+  const gate = document.getElementById('gate');
+  const input = document.getElementById('gateInput');
+  const error = document.getElementById('gateError');
+
+  function submit(){
+    if (input.value.trim() === ACCESS_CODE){
+      gate.remove();
+      return;
+    }
+    error.hidden = false;
+    input.value = '';
+    input.focus();
+  }
+
+  document.getElementById('gateBtn').addEventListener('click', submit);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+  input.focus();
+})();
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.1/dist/body-pix.min.umd.js"></script>
+<script>
+(function(){
+  const AVG_HUMAN_HEIGHT_M = 1.7;
+  const FOCAL_LENGTH_PX = 700; // rough default, same assumption as main_algorithm.py
+
+  const video = document.getElementById('video');
+  const overlay = document.getElementById('overlay');
+  const ctx = overlay.getContext('2d');
+  const thermalCanvas = document.getElementById('thermalCanvas');
+  const thermalCtx = thermalCanvas.getContext('2d', { willReadFrequently: true });
+  const viewport = document.getElementById('viewport');
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const thermalBtn = document.getElementById('thermalBtn');
+  const stateChip = document.getElementById('stateChip');
+  const stateText = document.getElementById('stateText');
+  const osdRes = document.getElementById('osdRes');
+  const osdFps = document.getElementById('osdFps');
+  const countEl = document.getElementById('count');
+  const countNum = document.getElementById('countNum');
+  const msg = document.getElementById('msg');
+  const railCount = document.getElementById('railCount');
+  const detectionRows = document.getElementById('detectionRows');
+
+  let stream = null;
+  let model = null;
+  let segmenter = null;
+  let running = false;
+  let thermalMode = true;
+  let lastFrameTime = performance.now();
+  let frameTick = 0;
+  let lastMask = null;
+
+  // --- The scene is mapped onto a cold ramp and the person onto a hot one.
+  // Which pixels are "person" comes from BodyPix's per-pixel segmentation
+  // mask, never from brightness; brightness only shades within each ramp, so
+  // the image keeps its form instead of going flat.
+  //          [ dark end,        bright end ]  per channel
+  const COLD = [[6, 52], [14, 92], [40, 208]];   // deep navy -> steel blue
+  const HOT  = [[205, 255], [22, 58], [16, 30]]; // deep red  -> hot red
+
+  const MARK_COLOR = '#FF7A3D';
+
+  function renderThermalFrame(segmentation){
+    const maxW = 480;
+    const scale = Math.min(1, maxW / video.videoWidth);
+    const w = Math.max(1, Math.round(video.videoWidth * scale));
+    const h = Math.max(1, Math.round(video.videoHeight * scale));
+    if (thermalCanvas.width !== w || thermalCanvas.height !== h){
+      thermalCanvas.width = w;
+      thermalCanvas.height = h;
+    }
+    thermalCtx.drawImage(video, 0, 0, w, h);
+    const frame = thermalCtx.getImageData(0, 0, w, h);
+    const data = frame.data;
+
+    // segmentation mask is at the video's native size; this canvas may be
+    // downscaled, so map each canvas pixel back into the mask
+    const mask = segmentation ? segmentation.data : null;
+    const maskW = segmentation ? segmentation.width : 0;
+    const maskH = segmentation ? segmentation.height : 0;
+
+    for (let py = 0; py < h; py++){
+      const maskRow = mask ? Math.min(maskH - 1, (py / scale) | 0) * maskW : 0;
+      for (let px = 0; px < w; px++){
+        const i = (py * w + px) * 4;
+        const isPerson = mask
+          ? mask[maskRow + Math.min(maskW - 1, (px / scale) | 0)] === 1
+          : false;
+        const ramp = isPerson ? HOT : COLD;
+        const lum = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255;
+
+        data[i]     = ramp[0][0] + (ramp[0][1] - ramp[0][0]) * lum;
+        data[i + 1] = ramp[1][0] + (ramp[1][1] - ramp[1][0]) * lum;
+        data[i + 2] = ramp[2][0] + (ramp[2][1] - ramp[2][0]) * lum;
+      }
+    }
+    thermalCtx.putImageData(frame, 0, 0);
+  }
+
+  function setThermalMode(on){
+    thermalMode = on;
+    video.style.visibility = on ? 'hidden' : 'visible';
+    thermalCanvas.style.display = on ? 'block' : 'none';
+    thermalBtn.classList.toggle('is-on', on);
+    thermalBtn.setAttribute('aria-pressed', String(on));
+  }
+
+  function classifyPosition(centerX, frameWidth){
+    // video/overlay are mirrored (scaleX(-1)) for a natural selfie-view, so swap
+    // left/right here to match what's actually shown on screen.
+    const third = frameWidth / 3;
+    if (centerX < third) return 'right';
+    if (centerX > 2 * third) return 'left';
+    return 'center';
+  }
+
+  // COCO-SSD's person box still carries a bit of margin around the body;
+  // shrink it slightly so it hugs the person more tightly.
+  function tightenBox([x, y, w, h]){
+    const padW = w * 0.16, padHTop = h * 0.10, padHBottom = h * 0.04;
+    return [x + padW, y + padHTop, w - 2 * padW, h - padHTop - padHBottom];
+  }
+
+  // Corner brackets rather than a closed rectangle: a full box hides the
+  // subject's outline, which is the thing being demonstrated.
+  function drawTarget(x, y, w, h, label){
+    const arm = Math.max(9, Math.min(w, h) * 0.2);
+    ctx.strokeStyle = MARK_COLOR;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y + arm);           ctx.lineTo(x, y);             ctx.lineTo(x + arm, y);
+    ctx.moveTo(x + w - arm, y);       ctx.lineTo(x + w, y);         ctx.lineTo(x + w, y + arm);
+    ctx.moveTo(x + w, y + h - arm);   ctx.lineTo(x + w, y + h);     ctx.lineTo(x + w - arm, y + h);
+    ctx.moveTo(x + arm, y + h);       ctx.lineTo(x, y + h);         ctx.lineTo(x, y + h - arm);
+    ctx.stroke();
+
+    ctx.font = '500 12px "IBM Plex Mono", monospace';
+    const textW = ctx.measureText(label).width;
+    const boxH = 17;
+    const boxY = y - boxH - 5 < 0 ? y + h + 5 : y - boxH - 5;
+    ctx.fillStyle = 'rgba(5,9,10,0.82)';
+    ctx.fillRect(x, boxY, textW + 14, boxH);
+    ctx.fillStyle = MARK_COLOR;
+    ctx.fillRect(x, boxY, 2, boxH);
+    ctx.fillText(label, x + 8, boxY + 12.5);
+  }
+
+  function renderRows(people){
+    railCount.textContent = people.length ? String(people.length).padStart(2, '0') : '—';
+    if (people.length === 0){
+      detectionRows.innerHTML = '<p class="none">No people in frame</p>';
+      return;
+    }
+    detectionRows.innerHTML = people.map((p, i) => `
+      <div class="track">
+        <div class="track-top">
+          <span class="t-id">${String(i + 1).padStart(2, '0')}</span>
+          <span class="t-range">${p.distance ? '~' + p.distance + ' m' : '—'}</span>
+          <span class="t-conf">${(p.confidence * 100).toFixed(0)}%</span>
+        </div>
+        <div class="track-sub">${p.position} &middot; ${p.width}&times;${p.height} px</div>
+      </div>
+    `).join('');
+  }
+
+  async function detectLoop(){
+    if (!running) return;
+
+    const now = performance.now();
+    const fps = 1000 / (now - lastFrameTime);
+    lastFrameTime = now;
+
+    // maxNumBoxes raised well past a couple of people; minScore raised to 0.6 so
+    // only confident detections (with correspondingly accurate boxes) are kept.
+    const predictions = await model.detect(video, 30, 0.6);
+    const people = predictions.filter(p => p.class === 'person');
+    const tightBoxes = people.map(p => tightenBox(p.bbox));
+
+    if (thermalMode) {
+      // Segmentation is by far the most expensive call in the loop. Running it
+      // on alternate frames and reusing the mask in between roughly doubles the
+      // frame rate; one frame of lag on the silhouette is imperceptible.
+      if (frameTick % 2 === 0 || !lastMask) {
+        lastMask = await segmenter.segmentPerson(video, {
+          internalResolution: 'medium',
+          segmentationThreshold: 0.7,
+        });
+      }
+      renderThermalFrame(lastMask);
+    }
+    frameTick++;
+
+    overlay.width = video.videoWidth;
+    overlay.height = video.videoHeight;
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+    const rows = people.map((p, i) => {
+      const [rawX, y, w, h] = tightBoxes[i];
+      const centerX = rawX + w / 2;
+      const distance = h > 0 ? ((AVG_HUMAN_HEIGHT_M * FOCAL_LENGTH_PX) / h).toFixed(2) : null;
+      const position = classifyPosition(centerX, overlay.width);
+
+      // video is mirrored via CSS (scaleX(-1)); flip the box x-coordinate to match
+      // so it lands on the person, while text/box drawing itself stays unmirrored
+      const x = overlay.width - rawX - w;
+
+      const id = String(i + 1).padStart(2, '0');
+      drawTarget(x, y, w, h, distance ? `${id}  ~${distance} m` : id);
+
+      return {
+        width: Math.round(w),
+        height: Math.round(h),
+        position,
+        distance,
+        confidence: p.score
+      };
+    });
+
+    countNum.textContent = people.length;
+    countEl.classList.toggle('has-people', people.length > 0);
+    osdFps.textContent = fps.toFixed(0);
+    renderRows(rows);
+
+    requestAnimationFrame(detectLoop);
+  }
+
+  async function start(){
+    startBtn.disabled = true;
+    msg.textContent = '';
+    stateText.textContent = 'Loading models';
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
+      await video.play();
+
+      if (!model) {
+        model = await cocoSsd.load();
+      }
+      if (!segmenter) {
+        // the UMD bundle registers itself as window['body-pix'], not `bodyPix`.
+        // Light MobileNet config — this runs every frame alongside COCO-SSD.
+        segmenter = await window['body-pix'].load({
+          architecture: 'MobileNetV1', outputStride: 16, multiplier: 0.5, quantBytes: 2
+        });
+      }
+
+      running = true;
+      stopBtn.disabled = false;
+      thermalBtn.disabled = false;
+      setThermalMode(thermalMode);
+      viewport.classList.add('is-running');
+      stateChip.classList.add('is-live');
+      stateText.textContent = 'Live';
+      osdRes.textContent = `${video.videoWidth}×${video.videoHeight}`;
+      lastFrameTime = performance.now();
+      requestAnimationFrame(detectLoop);
+    } catch (err) {
+      stateText.textContent = 'Standby';
+      msg.textContent = 'Camera blocked. Allow camera access, then start the feed.';
+      startBtn.disabled = false;
+      console.error(err);
+    }
+  }
+
+  function stop(){
+    running = false;
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+    lastMask = null;
+    viewport.classList.remove('is-running');
+    stateChip.classList.remove('is-live');
+    stateText.textContent = 'Standby';
+    osdRes.textContent = '—';
+    osdFps.textContent = '—';
+    countNum.textContent = '0';
+    countEl.classList.remove('has-people');
+    renderRows([]);
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    thermalBtn.disabled = true;
+  }
+
+  startBtn.addEventListener('click', start);
+  stopBtn.addEventListener('click', stop);
+  thermalBtn.addEventListener('click', () => setThermalMode(!thermalMode));
+})();
+</script>
+
+</body>
+</html>

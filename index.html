@@ -171,6 +171,20 @@
   .pillar p{font-size:14.5px; color:var(--text-dim);}
   @media (max-width:720px){ .pillars{grid-template-columns:1fr;} }
 
+  .demo-cta{display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:22px;}
+  .demo-btn{
+    display:inline-flex; align-items:center; gap:10px;
+    background:var(--accent); color:#160B06;
+    font-family:var(--font-mono); font-size:13px; font-weight:600;
+    letter-spacing:0.04em; text-transform:uppercase; text-decoration:none;
+    border:1px solid var(--accent); border-radius:8px; padding:13px 20px;
+    transition:background .15s ease, transform .15s ease;
+  }
+  .demo-btn:hover{background:#ff8d59; border-color:#ff8d59; transform:translateY(-1px);}
+  .demo-btn.secondary{background:transparent; color:var(--text); border:1px solid var(--line);}
+  .demo-btn.secondary:hover{background:var(--bg-card); border-color:var(--accent-dim);}
+  .demo-note{font-family:var(--font-mono); font-size:12px; color:var(--text-faint); flex-basis:100%;}
+
   /* ---------- Compare table ---------- */
   .compare-wrap{overflow-x:auto; margin-top:36px; border:1px solid var(--line); border-radius:12px;}
   table.compare{border-collapse:collapse; width:100%; min-width:640px; font-size:14.5px;}
@@ -431,6 +445,12 @@
       <div class="sec-num">02 — Proposed solution</div>
       <h2>A self-flying rescue aircraft, no cloud required.</h2>
       <p class="lede" style="margin-top:14px;">The entire perception and navigation stack runs on a Qualcomm edge processor — no cloud, no ground link required.</p>
+
+      <div class="demo-cta">
+        <a class="demo-btn" href="algorithm/ui.html">▶ &nbsp;Try the live detection console</a>
+        <a class="demo-btn secondary" href="videos.html">🎬 &nbsp;Watch the mission reel</a>
+        <span class="demo-note">The console runs the detection stack live in your browser; the reel walks the full flight sequence. Both need an access code.</span>
+      </div>
     </div>
     <div class="pillars">
       <div class="pillar">
