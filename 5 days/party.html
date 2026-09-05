@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Party Lights</title>
+<style>
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: #000;
+    color: #fff;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex; align-items: center; justify-content: center;
+    text-align: center;
+    overflow: hidden;
+  }
+  .panel {
+    background: rgba(0,0,0,.65);
+    padding: 28px 32px;
+    border-radius: 16px;
+    max-width: 600px;
+    position: relative; z-index: 5;
+  }
+  h1 { margin: 0 0 8px; font-size: 2rem; letter-spacing: .04em; }
+  p  { margin: 8px 0; line-height: 1.5; }
+  .warn { color: #ffd166; font-weight: 700; }
+  .controls { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  button {
+    font: inherit; font-weight: 700;
+    padding: 12px 22px; border: 0; border-radius: 999px;
+    background: #fff; color: #000; cursor: pointer;
+  }
+  button.secondary { background: rgba(255,255,255,.2); color: #fff; }
+  label { font-size: .9rem; opacity: .85; display: block; margin-top: 14px; }
+  input[type=range] { width: 220px; vertical-align: middle; }
+  .hint { position: fixed; bottom: 14px; left: 0; right: 0; font-size: .8rem;
+          color: #000; mix-blend-mode: difference; opacity: .7; z-index: 5; }
+  .hidden { display: none !important; }
+
+  /* Password gate */
+  #gate {
+    position: fixed; inset: 0; z-index: 20;
+    background: #000;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #gate .box { max-width: 380px; padding: 28px 32px; text-align: center; }
+  #gate h2 { margin: 0 0 14px; font-size: 1.4rem; letter-spacing: .04em; }
+  #gate input {
+    font: inherit; font-size: 1.4rem; text-align: center; letter-spacing: .4em;
+    width: 180px; padding: 10px 12px; border: 2px solid #444; border-radius: 10px;
+    background: #111; color: #fff;
+  }
+  #gate .err { color: #ff5252; font-weight: 700; min-height: 1.4em; margin-top: 10px; }
+  #gate .shake { animation: shake .35s; }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    75% { transform: translateX(8px); }
+  }
+
+  /* "5 din" scene: character on the left, message on the right */
+  #dinScene {
+    position: fixed; inset: 0; z-index: 4;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 3vw; padding: 0 4vw;
+    pointer-events: none; user-select: none;
+  }
+  #dinScene .face { width: min(42vw, 46vh); flex: 0 0 auto; }
+  #dinScene .msg {
+    flex: 1 1 auto; text-align: right;
+    font-size: clamp(28px, 6vw, 92px);
+    font-weight: 900; line-height: 1.15; letter-spacing: .02em;
+    color: #fff; -webkit-text-stroke: 3px #000;
+    text-shadow: 0 6px 0 rgba(0,0,0,.35);
+  }
+  @media (max-aspect-ratio: 3/4) {
+    #dinScene { flex-direction: column; justify-content: center; }
+    #dinScene .msg { text-align: center; }
+    #dinScene .face { width: 60vw; }
+  }
+
+  #word {
+    position: fixed; inset: 0; z-index: 4;
+    display: flex; align-items: center; justify-content: center;
+    font-size: clamp(48px, 16vw, 260px);
+    font-weight: 900; letter-spacing: .06em;
+    color: #fff; -webkit-text-stroke: 3px #000;
+    pointer-events: none; user-select: none;
+    transform: scale(.9) rotate(0deg);
+  }
+  .dot {
+    position: fixed; z-index: 3; width: 14px; height: 14px; border-radius: 50%;
+    pointer-events: none; will-change: transform, opacity;
+  }
+</style>
+</head>
+<body>
+  <div id="gate">
+    <div class="box">
+      <h2>🔒 Enter password</h2>
+      <input id="pw" type="password" inputmode="numeric" autocomplete="off" placeholder="•••">
+      <div class="controls"><button id="unlock">Unlock</button></div>
+      <div class="err" id="pwErr"></div>
+    </div>
+  </div>
+  <div class="panel" id="panel">
+    <h1>🎉 PARTY LIGHTS 🎉</h1>
+    <p class="warn">Warning: full-brightness red / green / blue strobing.</p>
+    <div class="controls">
+      <button id="start">🔥 GO WILD</button>
+      <button class="secondary" id="din5">5 din</button>
+    </div>
+    <label>Speed: <input type="range" id="speed" min="50" max="1000" value="130"> <span id="speedLabel">130 ms</span></label>
+  </div>
+
+  <div id="word" class="hidden"></div>
+
+  <div id="dinScene" class="hidden">
+    <svg class="face" viewBox="0 0 300 320" fill="none" stroke="#000" stroke-width="9"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <!-- big round head -->
+      <path d="M150 14c78 0 126 46 126 108s-48 106-126 106S24 184 24 122 72 14 150 14z"/>
+      <!-- angry brow -->
+      <path d="M96 84l58 34"/>
+      <!-- squinting eyes -->
+      <path d="M84 132c20-9 46-9 62 2-20 8-44 8-62-2z" fill="#000" stroke="none"/>
+      <path d="M196 128c8 7 14 12 20 14"/>
+      <path d="M186 112l10 -18M206 118l16 -12M212 134l20 -2"/>
+      <!-- smug wavy mouth -->
+      <path d="M150 176c10 14 22 16 30 6 6-8 4-16-2-20"/>
+      <!-- tiny arms -->
+      <path d="M112 236c-14 10-22 28-16 46 3 9 9 14 14 14"/>
+      <path d="M188 236c14 10 22 28 16 46-3 9-9 14-14 14"/>
+    </svg>
+    <div class="msg">Ab ka 5 din ma bacha ki jan laga 🤡</div>
+  </div>
+  <div class="hint hidden" id="hint">Space = pause · Esc = stop · F = fullscreen · click anywhere = burst</div>
+
+<script>
+(function () {
+  // Simple front-door code. Client-side only - it keeps casual hands off, not attackers.
+  const gate = document.getElementById('gate');
+  const pw = document.getElementById('pw');
+  const pwErr = document.getElementById('pwErr');
+  function tryUnlock() {
+    if (pw.value.trim() === '212') { gate.remove(); }
+    else {
+      pwErr.textContent = 'Nope, try again';
+      gate.querySelector('.box').classList.remove('shake');
+      void gate.offsetWidth;
+      gate.querySelector('.box').classList.add('shake');
+      pw.value = ''; pw.focus();
+    }
+  }
+  document.getElementById('unlock').addEventListener('click', tryUnlock);
+  pw.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
+  pw.focus();
+
+  const body   = document.body;
+  const panel  = document.getElementById('panel');
+  const hint   = document.getElementById('hint');
+  const word   = document.getElementById('word');
+  const dinScene = document.getElementById('dinScene');
+  const speed  = document.getElementById('speed');
+  const speedLabel = document.getElementById('speedLabel');
+
+  // Pure, maximum-brightness RGB.
+  const COLORS = ['#ff0000', '#00ff00', '#0000ff'];
+  const WORDS  = ['PARTY!', 'LET\u2019S GO', 'RED', 'GREEN', 'BLUE', 'WOOO', 'DANCE', '\uD83C\uDF89', 'TURN IT UP'];
+
+  let timer = null, i = 0, chase = false, running = false, flood = false, din = false, wakeLock = null;
+
+  async function goFullscreen() {
+    try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen(); } catch (e) {}
+    try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+  }
+
+  function step() {
+    const color = chase ? COLORS[i % 3] : COLORS[Math.floor(Math.random() * 3)];
+    i++;
+    body.style.backgroundColor = color;
+
+    if (flood || din) return;   // nothing drawn over the light
+
+    word.textContent = WORDS[Math.floor(Math.random() * WORDS.length)];
+    const scale = 0.85 + Math.random() * 0.45;
+    const rot   = (Math.random() * 16 - 8).toFixed(1);
+    word.style.transform = `scale(${scale.toFixed(2)}) rotate(${rot}deg)`;
+
+    if (Math.random() < 0.35) burst(innerWidth * Math.random(), innerHeight * Math.random(), 8);
+  }
+
+  function burst(x, y, n) {
+    for (let k = 0; k < n; k++) {
+      const d = document.createElement('div');
+      d.className = 'dot';
+      d.style.left = x + 'px';
+      d.style.top  = y + 'px';
+      d.style.background = COLORS[k % 3];
+      body.appendChild(d);
+      const dx = (Math.random() * 2 - 1) * 260;
+      const dy = (Math.random() * 2 - 1) * 260;
+      d.animate(
+        [ { transform: 'translate(0,0) scale(1)',              opacity: 1 },
+          { transform: `translate(${dx}px, ${dy}px) scale(0)`, opacity: 0 } ],
+        { duration: 700 + Math.random() * 400, easing: 'cubic-bezier(.2,.8,.3,1)' }
+      ).onfinish = () => d.remove();
+    }
+  }
+
+  function start(isChase, isFlood, isDin) {
+    chase   = !!isChase;
+    flood   = !!isFlood;
+    din     = !!isDin;
+    running = true;
+    goFullscreen();
+    panel.classList.add('hidden');
+    hint.classList.toggle('hidden', flood);
+    word.classList.toggle('hidden', flood || din);
+    dinScene.classList.toggle('hidden', !din);
+    clearInterval(timer);
+    timer = setInterval(step, Number(speed.value));
+    step();
+  }
+
+  function stop() {
+    running = false;
+    flood = false;
+    din = false;
+    dinScene.classList.add('hidden');
+    clearInterval(timer); timer = null;
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+    body.style.backgroundColor = '#000';
+    panel.classList.remove('hidden');
+    hint.classList.add('hidden');
+    word.classList.add('hidden');
+  }
+
+  function togglePause() {
+    if (!running) return;
+    if (timer) { clearInterval(timer); timer = null; }
+    else { timer = setInterval(step, Number(speed.value)); }
+  }
+
+  document.getElementById('start').addEventListener('click', () => start(false, false));
+  document.getElementById('din5').addEventListener('click', () => start(true, false, true));
+
+  speed.addEventListener('input', () => {
+    speedLabel.textContent = speed.value + ' ms';
+    if (running && timer) {
+      clearInterval(timer);
+      timer = setInterval(step, Number(speed.value));
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (running && !flood) burst(e.clientX, e.clientY, 18);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') { e.preventDefault(); togglePause(); }
+    else if (e.key === 'Escape') stop();
+    else if (e.key.toLowerCase() === 'f') {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen?.();
+    }
+  });
+
+  // Gentler default for anyone who asked the OS for reduced motion.
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    speed.value = 600;
+    speedLabel.textContent = '600 ms';
+  }
+})();
+</script>
+</body>
+</html>
