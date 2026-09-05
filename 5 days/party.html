@@ -182,9 +182,8 @@
   const word   = document.getElementById('word');
   const dinScene = document.getElementById('dinScene');
   const dinAudio = document.getElementById('dinAudio');
-
   // Route the track through Web Audio so it can go past the element's 1.0 ceiling.
-  const BOOST = 2.0;            // 100% louder than normal max
+  const BOOST = 5.0;            // 500% of normal max
   let audioCtx = null, audioGain = null, audioMuted = false;
   function boostAudio() {
     if (audioCtx) { audioCtx.resume().catch(() => {}); return; }
@@ -195,7 +194,14 @@
       const src = audioCtx.createMediaElementSource(dinAudio);
       audioGain = audioCtx.createGain();
       audioGain.gain.value = BOOST;
-      src.connect(audioGain).connect(audioCtx.destination);
+      // Limiter after the gain: without it 5x just clips into noise.
+      const limiter = audioCtx.createDynamicsCompressor();
+      limiter.threshold.value = -6;
+      limiter.knee.value = 0;
+      limiter.ratio.value = 20;
+      limiter.attack.value = 0.003;
+      limiter.release.value = 0.15;
+      src.connect(audioGain).connect(limiter).connect(audioCtx.destination);
     } catch (e) { dinAudio.volume = 1; }
   }
   function toggleMute() {
