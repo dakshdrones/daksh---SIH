@@ -73,10 +73,29 @@
     color: #fff; -webkit-text-stroke: 3px #000;
     text-shadow: 0 6px 0 rgba(0,0,0,.35);
   }
-  @media (max-aspect-ratio: 3/4) {
-    #dinScene { flex-direction: column; justify-content: center; }
-    #dinScene .msg { text-align: center; }
-    #dinScene .face { width: 60vw; }
+
+  /* Phone / portrait: stack the face over the line, keep both big and readable */
+  @media (max-aspect-ratio: 1/1) {
+    #dinScene {
+      flex-direction: column;
+      justify-content: center;
+      gap: 4vh;
+      padding: max(4vh, env(safe-area-inset-top)) 6vw max(4vh, env(safe-area-inset-bottom));
+    }
+    #dinScene .face { width: min(72vw, 38vh); }
+    #dinScene .msg {
+      flex: 0 0 auto;
+      text-align: center;
+      font-size: clamp(26px, 8.5vw, 64px);
+      line-height: 1.2;
+      -webkit-text-stroke-width: 2px;
+      text-wrap: balance;
+    }
+  }
+  /* Very short screens (landscape phone): shrink so nothing clips */
+  @media (max-height: 460px) {
+    #dinScene .face { width: min(34vw, 62vh); }
+    #dinScene .msg { font-size: clamp(20px, 5vw, 44px); -webkit-text-stroke-width: 2px; }
   }
 
   #word {
@@ -115,6 +134,7 @@
 
   <div id="word" class="hidden"></div>
 
+  <audio id="dinAudio" src="ReelAudio-75420.mp3" loop preload="auto"></audio>
   <div id="dinScene" class="hidden">
     <svg class="face" viewBox="0 0 300 320" fill="none" stroke="#000" stroke-width="9"
          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -134,7 +154,7 @@
     </svg>
     <div class="msg">Ab ka 5 din ma bacha ki jan laga 🤡</div>
   </div>
-  <div class="hint hidden" id="hint">Space = pause · Esc = stop · F = fullscreen · click anywhere = burst</div>
+  <div class="hint hidden" id="hint">Space = pause · Esc = stop · F = fullscreen · M = mute · click anywhere = burst</div>
 
 <script>
 (function () {
@@ -161,6 +181,28 @@
   const hint   = document.getElementById('hint');
   const word   = document.getElementById('word');
   const dinScene = document.getElementById('dinScene');
+  const dinAudio = document.getElementById('dinAudio');
+
+  // Route the track through Web Audio so it can go past the element's 1.0 ceiling.
+  const BOOST = 2.0;            // 100% louder than normal max
+  let audioCtx = null, audioGain = null, audioMuted = false;
+  function boostAudio() {
+    if (audioCtx) { audioCtx.resume().catch(() => {}); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) { dinAudio.volume = 1; return; }
+    try {
+      audioCtx = new AC();
+      const src = audioCtx.createMediaElementSource(dinAudio);
+      audioGain = audioCtx.createGain();
+      audioGain.gain.value = BOOST;
+      src.connect(audioGain).connect(audioCtx.destination);
+    } catch (e) { dinAudio.volume = 1; }
+  }
+  function toggleMute() {
+    audioMuted = !audioMuted;
+    if (audioGain) audioGain.gain.value = audioMuted ? 0 : BOOST;
+    else dinAudio.muted = audioMuted;
+  }
   const speed  = document.getElementById('speed');
   const speedLabel = document.getElementById('speedLabel');
 
@@ -218,6 +260,8 @@
     hint.classList.toggle('hidden', flood);
     word.classList.toggle('hidden', flood || din);
     dinScene.classList.toggle('hidden', !din);
+    if (din) { boostAudio(); dinAudio.currentTime = 0; dinAudio.volume = 1; dinAudio.play().catch(() => {}); }
+    else { dinAudio.pause(); }
     clearInterval(timer);
     timer = setInterval(step, Number(speed.value));
     step();
@@ -228,6 +272,7 @@
     flood = false;
     din = false;
     dinScene.classList.add('hidden');
+    dinAudio.pause(); dinAudio.currentTime = 0;
     clearInterval(timer); timer = null;
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
@@ -261,6 +306,7 @@
   document.addEventListener('keydown', (e) => {
     if (e.code === 'Space') { e.preventDefault(); togglePause(); }
     else if (e.key === 'Escape') stop();
+    else if (e.key.toLowerCase() === 'm') { toggleMute(); }
     else if (e.key.toLowerCase() === 'f') {
       if (document.fullscreenElement) document.exitFullscreen();
       else document.documentElement.requestFullscreen?.();
