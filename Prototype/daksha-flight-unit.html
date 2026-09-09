@@ -1,0 +1,668 @@
+<title>DAKSHA Flight Unit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+
+<style>
+:root{
+  --ground:#0B1B2B;
+  --panel:#132A41;
+  --rail:#16304A;
+  --edge:#20405E;
+  --accent:#FF6B35;
+  --accent-dim:#B14A22;
+  --fg:#F2F5F7;
+  --mut:#9FB3C4;
+  --ok:#4FB477;
+  --prov:#D9A441;
+  --serif:"Source Serif 4",Cambria,Georgia,serif;
+  --sans:"IBM Plex Sans",Calibri,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--ground);color:var(--fg);
+  font-family:var(--sans);font-size:14px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.app{
+  display:grid;
+  grid-template-columns:290px minmax(0,1fr) 320px;
+  grid-template-rows:auto minmax(0,1fr) auto;
+  height:100vh;overflow:hidden;
+}
+/* ---------- masthead ---------- */
+.masthead{
+  grid-column:1/-1;
+  display:flex;align-items:baseline;gap:18px;flex-wrap:wrap;
+  padding:18px 26px 16px;
+  border-bottom:1px solid var(--edge);
+}
+.wordmark{font-family:var(--serif);font-size:26px;font-weight:600;letter-spacing:.01em}
+.wordmark span{color:var(--accent)}
+.masthead .sub{color:var(--mut);font-size:13px;max-width:52ch;text-wrap:balance}
+.masthead .ps{
+  margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.13em;
+  color:var(--mut);text-transform:uppercase;
+}
+/* ---------- rails ---------- */
+.rail{
+  border-right:1px solid var(--edge);
+  padding:20px 0 28px;overflow-y:auto;
+}
+.rail-r{border-right:0;border-left:1px solid var(--edge);padding:20px 22px 28px;overflow-y:auto}
+.eyebrow{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--accent);margin:0 0 12px;
+}
+.rail .eyebrow{padding:0 22px}
+.parts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.part{
+  display:grid;grid-template-columns:22px 1fr auto;align-items:center;gap:11px;
+  padding:11px 22px;border:0;width:100%;text-align:left;cursor:pointer;
+  background:transparent;color:var(--mut);font:inherit;
+  border-left:2px solid transparent;transition:background .16s,color .16s,border-color .16s;
+}
+.part:hover{background:#16304a66;color:var(--fg)}
+.part[aria-selected="true"]{background:var(--rail);color:var(--fg);border-left-color:var(--accent)}
+.part .idx{font-family:var(--mono);font-size:11px;color:var(--accent);opacity:.8}
+.part .nm{font-weight:500;font-size:13.5px}
+.part .st{
+  width:7px;height:7px;border-radius:50%;flex:none;
+  background:var(--ok);box-shadow:0 0 0 3px #4fb47722;
+}
+.part .st.prov{background:var(--prov);box-shadow:0 0 0 3px #d9a44122}
+.part:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+/* ---------- stage ---------- */
+.stage{position:relative;min-height:440px;overflow:hidden}
+canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+canvas:active{cursor:grabbing}
+.hint{
+  position:absolute;left:24px;bottom:22px;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--mut);opacity:.75;pointer-events:none;
+}
+.tools{
+  position:absolute;right:20px;top:18px;display:flex;flex-direction:column;gap:9px;align-items:flex-end;
+}
+.tool{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  background:#132a41cc;color:var(--mut);border:1px solid var(--edge);
+  padding:7px 12px;border-radius:2px;cursor:pointer;backdrop-filter:blur(6px);
+  transition:color .16s,border-color .16s;
+}
+.tool:hover{color:var(--fg);border-color:var(--accent-dim)}
+.tool[aria-pressed="true"]{color:var(--accent);border-color:var(--accent)}
+.tool:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.slider{
+  display:flex;align-items:center;gap:10px;background:#132a41cc;border:1px solid var(--edge);
+  padding:7px 12px;border-radius:2px;backdrop-filter:blur(6px);
+}
+.slider label{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);
+}
+.slider input{width:92px;accent-color:var(--accent)}
+/* projected labels */
+.marker{
+  position:absolute;transform:translate(-50%,-50%);pointer-events:none;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--mut);white-space:nowrap;opacity:0;transition:opacity .25s;
+}
+.marker.on{opacity:1}
+.marker.cur{color:var(--accent)}
+.marker::before{
+  content:"";display:inline-block;width:5px;height:5px;border-radius:50%;
+  background:currentColor;margin-right:7px;vertical-align:1px;
+}
+/* ---------- detail ---------- */
+.detail h2{
+  font-family:var(--serif);font-size:23px;font-weight:600;margin:0 0 4px;line-height:1.15;
+  text-wrap:balance;
+}
+.badge{
+  display:inline-flex;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  padding:3px 8px;border-radius:2px;margin-bottom:14px;
+}
+.badge.ok{color:var(--ok);background:#4fb47718;border:1px solid #4fb47740}
+.badge.prov{color:var(--prov);background:#d9a44118;border:1px solid #d9a44140}
+.detail p{color:var(--mut);margin:0 0 16px;font-size:13.5px}
+.specs{
+  list-style:none;margin:0 0 18px;padding:0;
+  border-top:1px solid var(--edge);
+}
+.specs li{
+  display:flex;justify-content:space-between;gap:14px;align-items:baseline;
+  padding:9px 0;border-bottom:1px solid var(--edge);
+}
+.specs dt,.specs .k{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);
+  flex:none;
+}
+.specs .v{text-align:right;font-size:13px;font-variant-numeric:tabular-nums}
+.src{
+  font-size:12px;color:var(--mut);border-left:2px solid var(--accent-dim);
+  padding:8px 0 8px 12px;margin:0;
+}
+.src b{color:var(--fg);font-weight:500}
+.thermal{height:5px;border-radius:2px;margin:0 0 14px;
+  background:linear-gradient(90deg,#0B1B2B,#2B3A8C,#B14A22,#FF6B35,#FFD37A,#FFFFFF);}
+/* ---------- footer note ---------- */
+.foot{
+  grid-column:1/-1;border-top:1px solid var(--edge);
+  padding:13px 26px;color:var(--mut);font-size:12px;
+  display:flex;gap:20px;flex-wrap:wrap;align-items:center;
+}
+.foot .key{display:inline-flex;align-items:center;gap:7px}
+.foot .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.foot .dot.ok{background:var(--ok)}
+.foot .dot.prov{background:var(--prov)}
+@media (max-width:1080px){
+  .app{grid-template-columns:1fr;grid-template-rows:auto;height:auto;overflow:visible}
+  .rail,.rail-r{border:0;border-bottom:1px solid var(--edge)}
+  .stage{height:56vh;min-height:380px;order:-1}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition-duration:.001ms!important}
+}
+/* ---------- access gate ---------- */
+#gate{
+  position:fixed; inset:0; z-index:100;
+  background:var(--ground);
+  display:flex; align-items:center; justify-content:center;
+  padding:24px;
+}
+.gate-box{
+  width:100%; max-width:330px;
+  background:var(--panel); border:1px solid var(--edge);
+  border-radius:10px; padding:26px 22px; text-align:center;
+}
+.gate-title{
+  font-family:var(--serif); font-size:17px;
+  letter-spacing:0.03em; text-transform:uppercase; margin-bottom:18px;
+}
+.gate-title span{ color:var(--accent); }
+.gate-label{
+  font-family:var(--mono); font-size:11px; letter-spacing:0.06em;
+  text-transform:uppercase; color:var(--mut); margin-bottom:10px;
+}
+#gateInput{
+  width:100%; text-align:center;
+  font-family:var(--mono); font-size:18px; letter-spacing:0.35em;
+  background:var(--rail); color:var(--fg);
+  border:1px solid var(--edge); border-radius:6px;
+  padding:10px 12px; margin-bottom:12px;
+}
+#gateInput:focus{ outline:none; border-color:var(--accent); }
+#gateBtn{
+  width:100%; cursor:pointer;
+  font-family:var(--mono); font-size:12px; font-weight:600;
+  letter-spacing:0.04em; text-transform:uppercase;
+  background:var(--accent); color:#160B06;
+  border:1px solid var(--accent); border-radius:6px; padding:10px 14px;
+}
+#gateError{
+  font-family:var(--mono); font-size:11px;
+  color:var(--accent); margin-top:12px;
+}
+</style>
+
+<div id="gate">
+  <div class="gate-box">
+    <div class="gate-title">Daksha <span>Flight Unit</span></div>
+    <div class="gate-label">Enter access code</div>
+    <input id="gateInput" type="password" inputmode="numeric" autocomplete="off">
+    <button id="gateBtn" type="button">Unlock</button>
+    <div id="gateError" hidden>Incorrect code</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // Gate only — this code sits in the page source, so it keeps casual visitors
+  // out but is not real access control.
+  const ACCESS_CODE = '1001';
+  const gate = document.getElementById('gate');
+  const input = document.getElementById('gateInput');
+  const error = document.getElementById('gateError');
+
+  function submit(){
+    if (input.value.trim() === ACCESS_CODE){
+      gate.remove();
+      return;
+    }
+    error.hidden = false;
+    input.value = '';
+    input.focus();
+  }
+
+  document.getElementById('gateBtn').addEventListener('click', submit);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+  input.focus();
+})();
+</script>
+
+<div class="app">
+  <header class="masthead">
+    <div class="wordmark">DAK<span>SHA</span></div>
+    <div class="sub">Offline autonomous search-and-rescue unit. Every payload item below is drawn from the funded bill of materials; the airframe is concept massing.</div>
+    <div class="ps">SIH26177 · Robotics &amp; Drones · VGU</div>
+  </header>
+
+  <nav class="rail" aria-label="Components">
+    <p class="eyebrow">Payload &amp; airframe</p>
+    <ul class="parts" id="parts" role="tablist"></ul>
+  </nav>
+
+  <div class="stage" id="stage">
+    <div class="tools">
+      <button class="tool" id="spin" aria-pressed="true">Rotors</button>
+      <button class="tool" id="orbit" aria-pressed="true">Auto-orbit</button>
+      <button class="tool" id="reset">Reset view</button>
+      <div class="slider">
+        <label for="ex">Explode</label>
+        <input type="range" id="ex" min="0" max="100" value="0" aria-label="Explode view">
+      </div>
+    </div>
+    <div class="hint">Drag to orbit · scroll to zoom · click a part</div>
+  </div>
+
+  <aside class="rail-r detail" id="detail" aria-live="polite"></aside>
+
+  <footer class="foot">
+    <span class="key"><i class="dot ok"></i> Funded bill of materials — itemised in the ₹10 L fund utilisation plan</span>
+    <span class="key"><i class="dot prov"></i> Provisional — geometry not yet locked, shown as concept massing</span>
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+"use strict";
+var stage=document.getElementById('stage');
+var reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------------- component register ---------------- */
+/* status: 'ok' = line item in the funded BOM, 'prov' = geometry/spec not yet fixed */
+var PARTS=[
+ {id:'compute',name:'Edge compute',status:'ok',
+  head:'Qualcomm QRB5165 / RB5',
+  blurb:'The whole reason the aircraft can fly without a network. Detection, SLAM and coverage planning all run here, on the Hexagon NPU, inside the airframe.',
+  specs:[['Line item','₹60,000'],['Role','Detection · SLAM · planning'],['Power envelope','< 15 W'],['Link required','None']],
+  src:'Fund utilisation plan — <b>Qualcomm RB5 / QRB5165 dev kit</b>, hardware and compute.'},
+ {id:'thermal',name:'LWIR thermal camera',status:'ok',thermal:true,
+  head:'Long-wave infrared module',
+  blurb:'Picks up body heat through darkness, smoke and light debris. The primary information source at night and the half of the fusion pair that sees people the RGB camera cannot.',
+  specs:[['Line item','₹90,000'],['Band','Long-wave infrared'],['Works in','Darkness · smoke · light debris'],['Fused with','RGB camera']],
+  src:'Fund utilisation plan — <b>LWIR thermal camera module</b>, the single largest sensor line.'},
+ {id:'rgb',name:'RGB camera',status:'ok',
+  head:'Visual confirmation camera',
+  blurb:'Confirms context and rejects false positives. Fusing it with the thermal stream is what turns a warm blob into a victim pin with a confidence score.',
+  specs:[['Role','Context · false-positive rejection'],['Pairing','Fused with LWIR'],['Output','Feeds victim pin confidence']],
+  src:'Deck section 02 — fused RGB, thermal and acoustic sensing.'},
+ {id:'depth',name:'Stereo depth bar',status:'ok',
+  head:'Depth sensing for obstacle avoidance',
+  blurb:'Feeds the SLAM and coverage planner. Obstacles come from onboard depth rather than a pre-surveyed map, which is what lets the drone be handed a bare polygon.',
+  specs:[['Line item','part of ₹40,000'],['Feeds','SLAM · coverage re-planning'],['Map needed','None — builds its own']],
+  src:'Fund utilisation plan — <b>depth camera</b>, grouped with mic array and mesh radio.'},
+ {id:'mic',name:'Acoustic array',status:'ok',
+  head:'Microphone array',
+  blurb:'Listens for distress cues under debris, where neither camera can see. The third sensing mode, and part of what makes detection under occlusion defensible.',
+  specs:[['Line item','part of ₹40,000'],['Detects','Distress cues under debris'],['Value','Occlusion cases cameras miss']],
+  src:'Fund utilisation plan — <b>mic array</b>.'},
+ {id:'mesh',name:'Mesh radio',status:'ok',
+  head:'Opportunistic mesh link',
+  blurb:'Not a control link. The mission completes with the radio silent; this is only how the victim map reaches the incident commander once the drone re-enters range.',
+  specs:[['Line item','part of ₹40,000'],['Required for flight','No'],['Carries','Victim pins · 3D site map']],
+  src:'Fund utilisation plan — <b>mesh radio</b>. Deck: mesh is opportunistic, not required.'},
+ {id:'battery',name:'Battery pack',status:'ok',
+  head:'Flight battery',
+  blurb:'The endurance budget the perception load is profiled against. Holding compute under 15 W is what keeps the payload from costing flight time.',
+  specs:[['Line item','₹30,000'],['Includes','Chargers and spares'],['Constraint','Perception load profiled against it']],
+  src:'Fund utilisation plan — <b>batteries, chargers and spares</b>.'},
+ {id:'props',name:'Motors &amp; rotors',status:'prov',
+  head:'Propulsion',
+  blurb:'Funded as a line item, but count and sizing are not fixed. Shown here as a quad X-frame because that is the common configuration at this payload class — not because it has been chosen.',
+  specs:[['Line item','₹80,000 (with airframe)'],['Rotor count','Not fixed — 4 shown'],['Sizing','Not fixed']],
+  src:'Fund utilisation plan — <b>airframes, motors and ESCs</b>. Configuration not specified.'},
+ {id:'frame',name:'Airframe',status:'prov',
+  head:'Airframe — concept massing',
+  blurb:'No wheelbase, rotor count or frame material is recorded in any project document. The geometry on screen is illustrative massing to hang the funded payload on, and should be replaced once the frame is chosen.',
+  specs:[['Line item','₹80,000 (with motors)'],['Wheelbase','Not specified'],['Material','Not specified'],['Owner','Arpan Sachan — hardware']],
+  src:'Not specified in the pitch deck, fund plan or team document. <b>Provide the frame spec and this updates to match.</b>'}
+];
+
+/* ---------------- scene ---------------- */
+var scene=new THREE.Scene();
+scene.background=new THREE.Color(0x0B1B2B);
+scene.fog=new THREE.Fog(0x0B1B2B,2.6,6.2);
+
+var camera=new THREE.PerspectiveCamera(38,1,0.05,100);
+var renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+stage.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0x9FB3C4,0x0B1B2B,0.55));
+var key=new THREE.DirectionalLight(0xffffff,0.85); key.position.set(2.2,3.4,1.8); scene.add(key);
+var rim=new THREE.DirectionalLight(0xFF6B35,0.55); rim.position.set(-2.4,0.7,-2.0); scene.add(rim);
+var fill=new THREE.DirectionalLight(0x6EA8D8,0.3); fill.position.set(-1.2,-1.6,1.4); scene.add(fill);
+
+/* materials */
+function mat(c,r,m,e){return new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m,emissive:e||0x000000});}
+var M={
+  shell:mat(0x1B3550,0.62,0.25),
+  shellDark:mat(0x122436,0.70,0.20),
+  carbon:mat(0x0E1A26,0.55,0.35),
+  metal:mat(0x8A9AA8,0.35,0.85),
+  accent:mat(0xFF6B35,0.45,0.30),
+  lens:mat(0x0A0E14,0.15,0.60),
+  lensHot:mat(0x33201A,0.30,0.50,0x5A2410),
+  glass:mat(0x8FD4FF,0.20,0.50,0x10303F)
+};
+M.prop=new THREE.MeshStandardMaterial({color:0x9FB3C4,roughness:0.5,metalness:0.2,transparent:true,opacity:0.55});
+
+var root=new THREE.Group(); scene.add(root);
+var groups={};
+function G(id,dir){var g=new THREE.Group(); g.userData={id:id,dir:new THREE.Vector3(dir[0],dir[1],dir[2])}; groups[id]=g; root.add(g); return g;}
+function add(g,geo,m,pos,rot){
+  var me=new THREE.Mesh(geo,m.clone());          // clone so dimming one group never touches another
+  me.position.set(pos[0],pos[1],pos[2]);
+  if(rot) me.rotation.set(rot[0],rot[1],rot[2]);
+  me.userData.partId=g.userData.id;
+  me.userData.isProp=(m===M.prop);
+  me.userData.base=me.userData.isProp?0.55:1;
+  g.add(me); return me;
+}
+
+/* --- airframe --- */
+var gFrame=G('frame',[0,-1,0]);
+add(gFrame,new THREE.BoxGeometry(0.27,0.085,0.21),M.shell,[0,0,0]);
+add(gFrame,new THREE.BoxGeometry(0.235,0.02,0.185),M.carbon,[0,0.053,0]);
+add(gFrame,new THREE.BoxGeometry(0.10,0.012,0.13),M.accent,[0,0.065,0.02]);
+// nose taper
+add(gFrame,new THREE.BoxGeometry(0.17,0.06,0.07),M.shellDark,[0,-0.005,0.13]);
+// arms + landing skids
+var ARM=[[1,1],[-1,1],[-1,-1],[1,-1]];
+ARM.forEach(function(s){
+  var a=add(gFrame,new THREE.BoxGeometry(0.30,0.017,0.026),M.carbon,[s[0]*0.155,0.012,s[1]*0.155]);
+  a.rotation.y=(s[0]*s[1]>0?-1:1)*Math.PI/4;
+  add(gFrame,new THREE.CylinderGeometry(0.006,0.006,0.10,10),M.carbon,[s[0]*0.10,-0.075,s[1]*0.10]);
+});
+[-1,1].forEach(function(sx){
+  add(gFrame,new THREE.BoxGeometry(0.022,0.014,0.30),M.shellDark,[sx*0.115,-0.128,0]);
+});
+
+/* --- motors + rotors --- */
+var gProps=G('props',[0,1.1,0]); var spinners=[];
+ARM.forEach(function(s){
+  var x=s[0]*0.265,z=s[1]*0.265;
+  add(gProps,new THREE.CylinderGeometry(0.028,0.032,0.038,18),M.metal,[x,0.038,z]);
+  add(gProps,new THREE.CylinderGeometry(0.010,0.010,0.022,10),M.shellDark,[x,0.066,z]);
+  var hub=new THREE.Group(); hub.position.set(x,0.072,z); gProps.add(hub); spinners.push(hub);
+  for(var b=0;b<2;b++){
+    var bl=new THREE.Mesh(new THREE.BoxGeometry(0.30,0.004,0.030),M.prop.clone());
+    bl.rotation.y=b*Math.PI/2;
+    bl.userData.partId='props'; bl.userData.isProp=true; bl.userData.base=0.55;
+    hub.add(bl);
+  }
+});
+
+/* --- gimbal pod: thermal + rgb --- */
+var gThermal=G('thermal',[0.9,-0.5,0.5]);
+add(gThermal,new THREE.SphereGeometry(0.052,20,16),M.shellDark,[-0.028,-0.075,0.105]);
+add(gThermal,new THREE.CylinderGeometry(0.026,0.028,0.045,20),M.lens,[-0.028,-0.082,0.145],[Math.PI/2,0,0]);
+add(gThermal,new THREE.CylinderGeometry(0.020,0.020,0.008,20),M.lensHot,[-0.028,-0.082,0.168],[Math.PI/2,0,0]);
+
+var gRgb=G('rgb',[-0.9,-0.5,0.5]);
+add(gRgb,new THREE.SphereGeometry(0.042,20,16),M.shellDark,[0.040,-0.072,0.105]);
+add(gRgb,new THREE.CylinderGeometry(0.020,0.022,0.040,20),M.lens,[0.040,-0.078,0.140],[Math.PI/2,0,0]);
+add(gRgb,new THREE.CylinderGeometry(0.015,0.015,0.007,20),M.glass,[0.040,-0.078,0.160],[Math.PI/2,0,0]);
+
+/* --- stereo depth bar --- */
+var gDepth=G('depth',[0,0.55,1.15]);
+add(gDepth,new THREE.BoxGeometry(0.175,0.026,0.022),M.shellDark,[0,0.012,0.108]);
+[-1,1].forEach(function(sx){
+  add(gDepth,new THREE.CylinderGeometry(0.009,0.009,0.010,14),M.glass,[sx*0.068,0.012,0.121],[Math.PI/2,0,0]);
+});
+
+/* --- acoustic array --- */
+var gMic=G('mic',[0,-1.25,-0.35]);
+[[-1,-1],[1,-1],[-1,1],[1,1]].forEach(function(s){
+  add(gMic,new THREE.CylinderGeometry(0.011,0.011,0.014,14),M.metal,[s[0]*0.072,-0.052,s[1]*0.062]);
+  add(gMic,new THREE.CylinderGeometry(0.007,0.007,0.004,14),M.accent,[s[0]*0.072,-0.060,s[1]*0.062]);
+});
+
+/* --- mesh radio --- */
+var gMesh=G('mesh',[0,1.0,-1.15]);
+add(gMesh,new THREE.BoxGeometry(0.07,0.022,0.05),M.shellDark,[0,0.052,-0.085]);
+[-1,1].forEach(function(sx){
+  var a=add(gMesh,new THREE.CylinderGeometry(0.0045,0.0045,0.115,10),M.metal,[sx*0.055,0.10,-0.10]);
+  a.rotation.z=sx*0.30; a.rotation.x=-0.22;
+  add(gMesh,new THREE.SphereGeometry(0.008,10,8),M.accent,[sx*0.072,0.155,-0.113]);
+});
+
+/* --- compute module --- */
+var gCompute=G('compute',[0,1.35,0.15]);
+add(gCompute,new THREE.BoxGeometry(0.125,0.030,0.105),M.shell,[0,0.080,0.005]);
+add(gCompute,new THREE.BoxGeometry(0.098,0.008,0.082),M.carbon,[0,0.098,0.005]);
+// heatsink fins
+for(var f=-4;f<=4;f++){
+  add(gCompute,new THREE.BoxGeometry(0.006,0.020,0.080),M.metal,[f*0.012,0.112,0.005]);
+}
+add(gCompute,new THREE.BoxGeometry(0.030,0.004,0.012),M.accent,[0.040,0.096,0.056]);
+
+/* --- battery --- */
+var gBatt=G('battery',[0,-1.5,-0.6]);
+add(gBatt,new THREE.BoxGeometry(0.145,0.045,0.095),M.carbon,[0,-0.078,-0.030]);
+add(gBatt,new THREE.BoxGeometry(0.145,0.008,0.095),M.shellDark,[0,-0.055,-0.030]);
+add(gBatt,new THREE.BoxGeometry(0.030,0.006,0.010),M.accent,[-0.048,-0.055,0.019]);
+
+/* store home positions */
+Object.keys(groups).forEach(function(k){groups[k].userData.home=groups[k].position.clone();});
+
+/* --- ground ring for scale --- */
+var ring=new THREE.Mesh(
+  new THREE.RingGeometry(0.42,0.425,72),
+  new THREE.MeshBasicMaterial({color:0x20405E,side:THREE.DoubleSide,transparent:true,opacity:0.55}));
+ring.rotation.x=-Math.PI/2; ring.position.y=-0.26; scene.add(ring);
+var ring2=new THREE.Mesh(
+  new THREE.RingGeometry(0.60,0.603,72),
+  new THREE.MeshBasicMaterial({color:0x20405E,side:THREE.DoubleSide,transparent:true,opacity:0.3}));
+ring2.rotation.x=-Math.PI/2; ring2.position.y=-0.26; scene.add(ring2);
+
+/* ---------------- labels ---------------- */
+var ANCHOR={
+  compute:[0,0.125,0.005], thermal:[-0.028,-0.082,0.168], rgb:[0.040,-0.078,0.160],
+  depth:[0,0.012,0.121], mic:[0.072,-0.060,0.062], mesh:[0.055,0.155,-0.113],
+  battery:[0,-0.100,-0.030], props:[0.265,0.072,0.265], frame:[0,0,-0.105]
+};
+var markers={};
+PARTS.forEach(function(p){
+  var el=document.createElement('div');
+  el.className='marker'; el.textContent=p.name.replace('&amp;','&');
+  stage.appendChild(el); markers[p.id]=el;
+});
+
+/* ---------------- rail ---------------- */
+var railEl=document.getElementById('parts');
+PARTS.forEach(function(p,i){
+  var li=document.createElement('li');
+  var b=document.createElement('button');
+  b.className='part'; b.setAttribute('role','tab'); b.setAttribute('aria-selected','false'); b.dataset.id=p.id;
+  b.innerHTML='<span class="idx">'+String(i+1).padStart(2,'0')+'</span>'+
+              '<span class="nm">'+p.name+'</span>'+
+              '<span class="st'+(p.status==='prov'?' prov':'')+'" title="'+
+              (p.status==='prov'?'Provisional':'Funded bill of materials')+'"></span>';
+  b.addEventListener('click',function(){select(p.id);});
+  li.appendChild(b); railEl.appendChild(li);
+});
+
+var detailEl=document.getElementById('detail');
+var current=null;
+function select(id){
+  current=id;
+  var p=null; PARTS.forEach(function(q){if(q.id===id)p=q;});
+  Array.prototype.forEach.call(railEl.querySelectorAll('.part'),function(b){
+    b.setAttribute('aria-selected',String(b.dataset.id===id));
+  });
+  var rows=p.specs.map(function(s){
+    return '<li><span class="k">'+s[0]+'</span><span class="v">'+s[1]+'</span></li>';
+  }).join('');
+  detailEl.innerHTML=
+    '<p class="eyebrow">Selected component</p>'+
+    (p.thermal?'<div class="thermal"></div>':'')+
+    '<h2>'+p.head+'</h2>'+
+    '<span class="badge '+(p.status==='prov'?'prov':'ok')+'">'+
+      (p.status==='prov'?'Provisional geometry':'Funded line item')+'</span>'+
+    '<p>'+p.blurb+'</p>'+
+    '<ul class="specs">'+rows+'</ul>'+
+    '<p class="src">'+p.src+'</p>';
+  // highlight
+  Object.keys(groups).forEach(function(k){
+    var on=(k===id);
+    groups[k].traverse(function(o){
+      if(o.isMesh){
+        o.material.opacity = on ? o.userData.base : o.userData.base*0.3;
+        o.material.transparent = !on || o.userData.isProp;
+        o.material.needsUpdate=true;
+      }
+    });
+    markers[k].classList.toggle('cur',on);
+  });
+  // frame the part
+  var a=ANCHOR[id];
+  focus.set(a[0],a[1],a[2]);
+  tRad = (id==='frame'||id==='props') ? 1.30 : 0.78;
+}
+function clearSel(){
+  current=null;
+  Array.prototype.forEach.call(railEl.querySelectorAll('.part'),function(b){b.setAttribute('aria-selected','false');});
+  Object.keys(groups).forEach(function(k){
+    groups[k].traverse(function(o){
+      if(o.isMesh){
+        o.material.opacity=o.userData.base;
+        o.material.transparent=o.userData.isProp;
+        o.material.needsUpdate=true;
+      }
+    });
+    markers[k].classList.remove('cur');
+  });
+  focus.set(0,0,0); tRad=1.45;
+  detailEl.innerHTML=
+    '<p class="eyebrow">Flight unit</p>'+
+    '<h2>Offline search-and-rescue unit</h2>'+
+    '<span class="badge ok">7 of 9 funded</span>'+
+    '<p>Given a search polygon, this aircraft plans its own coverage, detects victims on-board and returns a geo-tagged map — with no ground station, no LTE and no cloud in the loop.</p>'+
+    '<ul class="specs">'+
+      '<li><span class="k">Problem statement</span><span class="v">SIH26177</span></li>'+
+      '<li><span class="k">Compute</span><span class="v">QRB5165 · &lt; 15 W</span></li>'+
+      '<li><span class="k">Sensing modes</span><span class="v">Thermal · RGB · acoustic</span></li>'+
+      '<li><span class="k">Link required</span><span class="v">None</span></li>'+
+      '<li><span class="k">Hardware budget</span><span class="v">₹3,00,000</span></li>'+
+    '</ul>'+
+    '<p class="src">Select a component to isolate it. Green marks items itemised in the funded bill of materials; amber marks geometry that is <b>not yet specified anywhere in the project documents</b>.</p>';
+}
+
+/* ---------------- camera control ---------------- */
+var theta=0.72,phi=1.16,rad=1.9,tRad=1.45;
+var focus=new THREE.Vector3(0,0,0),camFocus=new THREE.Vector3(0,0,0);
+var drag=false,lx=0,ly=0,auto=!reduced,spin=true;
+
+renderer.domElement.addEventListener('pointerdown',function(e){
+  drag=true;lx=e.clientX;ly=e.clientY;renderer.domElement.setPointerCapture(e.pointerId);
+  moved=false;
+});
+var moved=false;
+renderer.domElement.addEventListener('pointermove',function(e){
+  if(!drag)return;
+  var dx=e.clientX-lx,dy=e.clientY-ly; lx=e.clientX;ly=e.clientY;
+  if(Math.abs(dx)+Math.abs(dy)>3) moved=true;
+  theta-=dx*0.0062; phi-=dy*0.0055;
+  phi=Math.max(0.22,Math.min(2.05,phi));
+  auto=false; document.getElementById('orbit').setAttribute('aria-pressed','false');
+});
+window.addEventListener('pointerup',function(){drag=false;});
+renderer.domElement.addEventListener('wheel',function(e){
+  e.preventDefault(); tRad=Math.max(0.5,Math.min(3.4,tRad+e.deltaY*0.0013));
+},{passive:false});
+
+/* click to select */
+var ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
+renderer.domElement.addEventListener('click',function(e){
+  if(moved)return;
+  var r=renderer.domElement.getBoundingClientRect();
+  ndc.x=((e.clientX-r.left)/r.width)*2-1;
+  ndc.y=-((e.clientY-r.top)/r.height)*2+1;
+  ray.setFromCamera(ndc,camera);
+  var hit=ray.intersectObject(root,true);
+  if(hit.length){
+    var o=hit[0].object;
+    while(o&&!o.userData.partId)o=o.parent;
+    if(o&&o.userData.partId){ if(o.userData.partId===current) clearSel(); else select(o.userData.partId); return;}
+  }
+  clearSel();
+});
+
+/* tools */
+document.getElementById('orbit').addEventListener('click',function(){
+  auto=!auto; this.setAttribute('aria-pressed',String(auto));
+});
+document.getElementById('spin').addEventListener('click',function(){
+  spin=!spin; this.setAttribute('aria-pressed',String(spin));
+});
+document.getElementById('reset').addEventListener('click',function(){
+  theta=0.72;phi=1.16;tRad=1.45;clearSel();
+  document.getElementById('ex').value=0;explode=0;
+});
+var explode=0;
+document.getElementById('ex').addEventListener('input',function(){explode=this.value/100;});
+
+/* ---------------- resize ---------------- */
+function resize(){
+  var w=stage.clientWidth,h=stage.clientHeight;
+  if(!w||!h)return;
+  renderer.setSize(w,h,false);
+  camera.aspect=w/h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize',resize);
+
+/* ---------------- loop ---------------- */
+var pv=new THREE.Vector3();
+function frame(){
+  requestAnimationFrame(frame);
+  if(auto&&!drag) theta+=0.0022;
+  rad+=(tRad-rad)*0.08;
+  camFocus.lerp(focus,0.09);
+  camera.position.set(
+    camFocus.x+rad*Math.sin(phi)*Math.sin(theta),
+    camFocus.y+rad*Math.cos(phi),
+    camFocus.z+rad*Math.sin(phi)*Math.cos(theta));
+  camera.lookAt(camFocus);
+
+  if(spin&&!reduced) spinners.forEach(function(h,i){h.rotation.y+=(i%2?-1:1)*0.42;});
+
+  Object.keys(groups).forEach(function(k){
+    var g=groups[k],hm=g.userData.home,d=g.userData.dir;
+    g.position.set(hm.x+d.x*explode*0.30, hm.y+d.y*explode*0.30, hm.z+d.z*explode*0.30);
+  });
+
+  // project markers
+  var r=renderer.domElement.getBoundingClientRect();
+  PARTS.forEach(function(p){
+    var a=ANCHOR[p.id],g=groups[p.id];
+    pv.set(a[0],a[1],a[2]).add(g.position).project(camera);
+    var el=markers[p.id];
+    var vis=pv.z<1 && (current===null||current===p.id);
+    el.classList.toggle('on',vis);
+    if(vis){
+      el.style.left=((pv.x*0.5+0.5)*r.width)+'px';
+      el.style.top=((-pv.y*0.5+0.5)*r.height)+'px';
+    }
+  });
+
+  renderer.render(scene,camera);
+}
+
+resize(); clearSel(); frame();
+})();
+</script>
