@@ -288,12 +288,12 @@ var PARTS=[
  {id:'compute',name:'Edge compute',status:'ok',
   head:'Qualcomm QRB5165 / RB5',
   blurb:'The whole reason the aircraft can fly without a network. Detection, SLAM and coverage planning all run here, on the Hexagon NPU, inside the airframe.',
-  specs:[['Line item','₹60,000'],['Role','Detection · SLAM · planning'],['Power envelope','< 15 W'],['Link required','None']],
+  specs:[['Line item','₹30,000'],['Role','Detection · SLAM · planning'],['Power envelope','< 15 W'],['Link required','None']],
   src:'Fund utilisation plan — <b>Qualcomm RB5 / QRB5165 dev kit</b>, hardware and compute.'},
  {id:'thermal',name:'LWIR thermal camera',status:'ok',thermal:true,
   head:'Long-wave infrared module',
   blurb:'Picks up body heat through darkness, smoke and light debris. The primary information source at night and the half of the fusion pair that sees people the RGB camera cannot.',
-  specs:[['Line item','₹90,000'],['Band','Long-wave infrared'],['Works in','Darkness · smoke · light debris'],['Fused with','RGB camera']],
+  specs:[['Line item','₹45,000'],['Band','Long-wave infrared'],['Works in','Darkness · smoke · light debris'],['Fused with','RGB camera']],
   src:'Fund utilisation plan — <b>LWIR thermal camera module</b>, the single largest sensor line.'},
  {id:'rgb',name:'RGB camera',status:'ok',
   head:'Visual confirmation camera',
@@ -303,32 +303,32 @@ var PARTS=[
  {id:'depth',name:'Stereo depth bar',status:'ok',
   head:'Depth sensing for obstacle avoidance',
   blurb:'Feeds the SLAM and coverage planner. Obstacles come from onboard depth rather than a pre-surveyed map, which is what lets the drone be handed a bare polygon.',
-  specs:[['Line item','part of ₹40,000'],['Feeds','SLAM · coverage re-planning'],['Map needed','None — builds its own']],
+  specs:[['Line item','part of ₹20,000'],['Feeds','SLAM · coverage re-planning'],['Map needed','None — builds its own']],
   src:'Fund utilisation plan — <b>depth camera</b>, grouped with mic array and mesh radio.'},
  {id:'mic',name:'Acoustic array',status:'ok',
   head:'Microphone array',
   blurb:'Listens for distress cues under debris, where neither camera can see. The third sensing mode, and part of what makes detection under occlusion defensible.',
-  specs:[['Line item','part of ₹40,000'],['Detects','Distress cues under debris'],['Value','Occlusion cases cameras miss']],
+  specs:[['Line item','part of ₹20,000'],['Detects','Distress cues under debris'],['Value','Occlusion cases cameras miss']],
   src:'Fund utilisation plan — <b>mic array</b>.'},
  {id:'mesh',name:'Mesh radio',status:'ok',
   head:'Opportunistic mesh link',
   blurb:'Not a control link. The mission completes with the radio silent; this is only how the victim map reaches the incident commander once the drone re-enters range.',
-  specs:[['Line item','part of ₹40,000'],['Required for flight','No'],['Carries','Victim pins · 3D site map']],
+  specs:[['Line item','part of ₹20,000'],['Required for flight','No'],['Carries','Victim pins · 3D site map']],
   src:'Fund utilisation plan — <b>mesh radio</b>. Deck: mesh is opportunistic, not required.'},
  {id:'battery',name:'Battery pack',status:'ok',
   head:'Flight battery',
   blurb:'The endurance budget the perception load is profiled against. Holding compute under 15 W is what keeps the payload from costing flight time.',
-  specs:[['Line item','₹30,000'],['Includes','Chargers and spares'],['Constraint','Perception load profiled against it']],
+  specs:[['Line item','₹15,000'],['Includes','Chargers and spares'],['Constraint','Perception load profiled against it']],
   src:'Fund utilisation plan — <b>batteries, chargers and spares</b>.'},
  {id:'props',name:'Motors &amp; rotors',status:'prov',
   head:'Propulsion',
   blurb:'Funded as a line item, but count and sizing are not fixed. Shown here as a quad X-frame because that is the common configuration at this payload class — not because it has been chosen.',
-  specs:[['Line item','₹80,000 (with airframe)'],['Rotor count','Not fixed — 4 shown'],['Sizing','Not fixed']],
+  specs:[['Line item','₹40,000 (with airframe)'],['Rotor count','Not fixed — 4 shown'],['Sizing','Not fixed']],
   src:'Fund utilisation plan — <b>airframes, motors and ESCs</b>. Configuration not specified.'},
  {id:'frame',name:'Airframe',status:'prov',
   head:'Airframe — concept massing',
   blurb:'No wheelbase, rotor count or frame material is recorded in any project document. The geometry on screen is illustrative massing to hang the funded payload on, and should be replaced once the frame is chosen.',
-  specs:[['Line item','₹80,000 (with motors)'],['Wheelbase','Not specified'],['Material','Not specified'],['Owner','Arpan Sachan — hardware']],
+  specs:[['Line item','₹40,000 (with motors)'],['Wheelbase','Not specified'],['Material','Not specified'],['Owner','Arpan Sachan — hardware']],
   src:'Not specified in the pitch deck, fund plan or team document. <b>Provide the frame spec and this updates to match.</b>'}
 ];
 
@@ -558,7 +558,7 @@ function clearSel(){
       '<li><span class="k">Compute</span><span class="v">QRB5165 · &lt; 15 W</span></li>'+
       '<li><span class="k">Sensing modes</span><span class="v">Thermal · RGB · acoustic</span></li>'+
       '<li><span class="k">Link required</span><span class="v">None</span></li>'+
-      '<li><span class="k">Hardware budget</span><span class="v">₹3,00,000</span></li>'+
+      '<li><span class="k">Drone total</span><span class="v">₹1,50,000</span></li>'+
     '</ul>'+
     '<p class="src">Select a component to isolate it. Green marks items itemised in the funded bill of materials; amber marks geometry that is <b>not yet specified anywhere in the project documents</b>.</p>';
 }
